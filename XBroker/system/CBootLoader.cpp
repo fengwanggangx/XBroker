@@ -37,7 +37,7 @@ bool CBootLoader::Initialize()
 	}
 
 	CLoginInfo login;
-	login.m_strAccount = config.GetValue(ini::Config::System, "HQMarket", "account", std::string());
+	login.m_strUser = config.GetValue(ini::Config::System, "HQMarket", "user", std::string());
 	login.m_strPassword = config.GetValue(ini::Config::System, "HQMarket", "password", std::string());
 	login.m_strToken = config.GetValue(ini::Config::System, "HQMarket", "token", std::string());
 	login.m_host.m_strName = "HQMarket";
