@@ -525,7 +525,7 @@ bool CTradeService::SendRequest(const CRequest& req, trade::CReqParam&& param)
 
 void CTradeService::OnEvent(const trade::CCountEvent& event)
 {
-	_TyPushHandler handler;
+	_TyRequestNotify handler;
 	CTradeAccountInfo info;
 	{
 		std::lock_guard<std::mutex> lock(m_mtx_accounts);
@@ -547,7 +547,7 @@ void CTradeService::OnEvent(const trade::CCountEvent& event)
 	}
 }
 
-void CTradeService::SetPushHandler(_TyPushHandler&& handler)
+void CTradeService::SetPushHandler(_TyRequestNotify&& handler)
 {
 	std::lock_guard<std::mutex> lock(m_mtx_accounts);
 	m_handler_push = std::move(handler);

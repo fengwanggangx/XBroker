@@ -93,7 +93,7 @@ bool CSession::SendRequest(const CRequest& request)
 	return (nullptr != m_client) && m_client->SendRequest(request);
 }
 
-void CSession::RegisterHandler(_TyResponseHandler&& handler)
+void CSession::RegisterHandler(_TyRequestNotify&& handler)
 {
 	std::lock_guard<std::mutex> lock(m_mtx_handlers);
 	m_handlers.emplace_back(std::move(handler));
@@ -332,7 +332,7 @@ void CSession::NotifyState(SessionState state, const std::string& strMessage)
 
 void CSession::Dispatch(const CRequest& req)
 {
-	std::vector<_TyResponseHandler> handlers;
+	std::vector<_TyRequestNotify> handlers;
 	{
 		std::lock_guard<std::mutex> lock(m_mtx_handlers);
 		handlers = m_handlers;

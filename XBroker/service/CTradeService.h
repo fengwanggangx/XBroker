@@ -14,7 +14,6 @@ class CRequest;
 class CTradeService final
 {
 public:
-	using _TyPushHandler = std::function<void(const CRequest&)>;
 
 	CTradeService();
 	~CTradeService();
@@ -31,7 +30,7 @@ public:
 	bool HandleTradeRequest(const CRequest& req);
 	bool HandleAccountRequest(const CRequest& req);
 
-	void SetPushHandler(_TyPushHandler&& handler);
+	void SetPushHandler(_TyRequestNotify&& handler);
 
 private:
 	friend class CLoginServiceTests;
@@ -54,7 +53,7 @@ private:
 	std::shared_ptr<trade::ITradeSession> FindCounter(const CRequest& req, _TyAccount& account) const;
 
 private:
-	std::unordered_map<_TyRequest, std::function<bool(const CRequest&)>> m_handler_request;
+	std::unordered_map<_TyRequest, _TyRequestNotify> m_handler_request;
 	mutable std::mutex m_mtx_accounts;
 	std::map<std::uint64_t, CBrokerInfo> m_brokers;
 	std::map<_TyAccount, CTradeAccount> m_accounts;
@@ -62,6 +61,6 @@ private:
 	std::vector<std::shared_ptr<trade::ITradeSession>> m_retired;
 	bool m_bStopping{ false };
 	std::string m_strLastError;
-	_TyPushHandler m_handler_push;
+	_TyRequestNotify m_handler_push;
 	trade::CCounterFactory m_counterFactory;
 };

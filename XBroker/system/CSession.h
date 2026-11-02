@@ -48,7 +48,6 @@ enum class SessionState
 class CSession final
 {
 public:
-	using _TyResponseHandler = std::function<void(const CRequest&)>;
 	using _TyStateHandler = std::function<void(SessionState, const std::string&)>;
 
 	explicit CSession(const CLoginInfo& info);
@@ -61,7 +60,7 @@ public:
 	// Call only after Stop has drained the network and session threads.
 	void ClearHandlers();
 	bool SendRequest(const CRequest& request);
-	void RegisterHandler(_TyResponseHandler&& handler);
+	void RegisterHandler(_TyRequestNotify&& handler);
 	void RegisterStateHandler(_TyStateHandler&& handler);
 	void SetStateHandler(_TyStateHandler&& handler);
 	SessionState GetState() const;
@@ -97,7 +96,7 @@ private:
 	std::optional<CLoginInfo> m_login;
 
 	std::mutex m_mtx_handlers;
-	std::vector<_TyResponseHandler> m_handlers;
+	std::vector<_TyRequestNotify> m_handlers;
 
 	std::vector<_TyStateHandler> m_stateHandlers;
 	int m_nHeartbeatSeconds{ 5 };

@@ -114,17 +114,19 @@ trade::CResult CBrokerService::InitializeCounters()
 	return {};
 }
 
-void CBrokerService::Broadcast(const CRequest& push)
+bool CBrokerService::Broadcast(const CRequest& push)
 {
 	std::vector<net::_TyConnectionId> clients;
 	{
 		std::lock_guard<std::mutex> lock(m_mtx_clients);
 		clients.assign(m_clients.begin(), m_clients.end());
 	}
+	bool bSent = true;
 	for (net::_TyConnectionId nId : clients)
 	{
-		net::SendRequest(nId, push);
+		bSent = net::SendRequest(nId, push) && bSent;
 	}
+	return bSent;
 }
 
 int CBrokerService::OnNetEvent(const net::CNetEvent& event)

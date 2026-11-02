@@ -35,7 +35,7 @@ public:
 	void OnDepth(trade::CDepth depth) override;
 	void OnMarketState(bool bAvailable) override;
 
-	void OnMarketResponse(const CRequest& request);
+	bool OnMarketResponse(const CRequest& request);
 	void OnSessionState(SessionState state, const std::string& message);
 	void SetDepthSubscriptionHandler(_TyDepthSubscriptionHandler&& handler);
 	bool ChangeDepthSubscription(CSession& session, const std::string& security, bool subscribe);

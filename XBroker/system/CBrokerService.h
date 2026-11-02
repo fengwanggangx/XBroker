@@ -29,7 +29,7 @@ public:
 	const std::string& GetLastError() const;
 
 private:
-	void Broadcast(const CRequest& push);
+	bool Broadcast(const CRequest& push);
 	int OnNetEvent(const net::CNetEvent& event);
 
 	trade::CResult InitializeCounters();
