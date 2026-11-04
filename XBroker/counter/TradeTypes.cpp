@@ -55,7 +55,7 @@ namespace trade
 			Read(stream, account.first);
 			Read(stream, account.second);
 		}
-		void Write(std::ostream& stream, const CAccount& value)
+		void Write(std::ostream& stream, const CFunds& value)
 		{
 			Write(stream, value.m_accountIndex);
 			Write(stream, value.m_nBalance);
@@ -63,7 +63,7 @@ namespace trade
 			Write(stream, value.m_bConnected);
 			Write(stream, value.m_bMigrated);
 		}
-		void Read(std::istream& stream, CAccount& value)
+		void Read(std::istream& stream, CFunds& value)
 		{
 			Read(stream, value.m_accountIndex);
 			Read(stream, value.m_nBalance);
@@ -225,7 +225,7 @@ namespace trade
 			Write(stream, value.m_kind);
 			Write(stream, value.m_order);
 			Write(stream, value.m_trade);
-			Write(stream, value.m_account);
+			Write(stream, value.m_funds);
 			Write(stream, value.m_position);
 		}
 		void Read(std::istream& stream, CCountEvent& value)
@@ -236,7 +236,7 @@ namespace trade
 			Read(stream, value.m_kind);
 			Read(stream, value.m_order);
 			Read(stream, value.m_trade);
-			Read(stream, value.m_account);
+			Read(stream, value.m_funds);
 			Read(stream, value.m_position);
 		}
 	} // namespace
@@ -316,7 +316,7 @@ namespace trade
 		}
 		for (std::size_t nIndex = 0; nIndex < nCount; ++nIndex)
 		{
-			CAccount value;
+			CFunds value;
 			Read(stream, value);
 			if (!stream || !next.m_accounts.emplace(value.m_accountIndex, std::move(value)).second)
 			{
@@ -459,7 +459,7 @@ namespace trade
 		}
 		if (event.m_bAccountValid)
 		{
-			snapshot.m_account = event.m_account;
+			snapshot.m_account = event.m_funds;
 		}
 		snapshot.m_version = event.m_sequence;
 		switch (event.m_kind)

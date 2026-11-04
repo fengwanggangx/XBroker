@@ -313,7 +313,7 @@ namespace
 		}
 		Check(!Send(first, Request(a, Operation::Login)).m_result.Ok(), "duplicate login rejected");
 		CCounterReply funds = Send(first, Request(a, Operation::Funds));
-		Check(funds.m_result.Ok() && 9000000 == std::get<CAccount>(funds.m_data).m_nAvailable, "explicit broker available cash");
+		Check(funds.m_result.Ok() && 9000000 == std::get<CFunds>(funds.m_data).m_nAvailable, "explicit broker available cash");
 		CCounterReply accepted = Send(first, Request(a, Operation::Submit));
 		Check(accepted.m_result.Ok(), "submit");
 		std::uint64_t id = std::get<COperationReceipt>(accepted.m_data).m_orderId;

@@ -101,7 +101,7 @@ int main()
 		CStorager second("second");
 		CState other;
 		Check(!second.Acquire(other).Ok(), "second owner must fail");
-		state.m_accounts.emplace(TestAccount(1), CAccount{ TestAccount(1), 100000, 0, false, true });
+		state.m_accounts.emplace(TestAccount(1), CFunds{ TestAccount(1), 100000, 0, false, true });
 		Check(first.Commit(state, 0).Ok(), "transactional checkpoint");
 		CSql session(pSocket, strDatabase);
 		Check(session.Execute("UPDATE sim_counter_lease SET expires_at='1970-01-01'"), "expire fixture");

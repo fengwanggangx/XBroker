@@ -26,11 +26,11 @@ public:
 
 	void Stop();
 	trade::CResult Initialize();
-	trade::CResult Start(const std::vector<trade::CAccount>& accounts, const std::vector<trade::CRule>& rules, const std::vector<trade::CCalendar>& calendar);
-	trade::CResult Start(std::unique_ptr<trade::ICounterStore> store, _TyClock&& clock, const std::vector<trade::CAccount>& accounts, const std::vector<trade::CRule>& rules, const std::vector<trade::CCalendar>& calendar);
+	trade::CResult Start(const std::vector<trade::CFunds>& accounts, const std::vector<trade::CRule>& rules, const std::vector<trade::CCalendar>& calendar);
+	trade::CResult Start(std::unique_ptr<trade::ICounterStore> store, _TyClock&& clock, const std::vector<trade::CFunds>& accounts, const std::vector<trade::CRule>& rules, const std::vector<trade::CCalendar>& calendar);
 
 	trade::CResult Send(trade::CReqParam request, _TyReplyHandler handler, std::uint64_t instance);
-	trade::CAccountData Snapshot(const _TyAccount& accountIndex) const;
+	trade::CAccountData Snapshot(const _TyAccount& account) const;
 
 	void OnDepth(trade::CDepth depth) override;
 	void OnMarketState(bool bAvailable) override;

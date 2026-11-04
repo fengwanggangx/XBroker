@@ -101,7 +101,7 @@ trade::CResult CSimulatedDispatcher::Initialize()
 	}
 }
 
-trade::CResult CSimulatedDispatcher::Start(const std::vector<trade::CAccount>& accounts, const std::vector<trade::CRule>& rules, const std::vector<trade::CCalendar>& calendar)
+trade::CResult CSimulatedDispatcher::Start(const std::vector<trade::CFunds>& accounts, const std::vector<trade::CRule>& rules, const std::vector<trade::CCalendar>& calendar)
 {
 	return Start(std::make_unique<trade::CStorager>(utility::MakeSaltHex()), SystemTime, accounts, rules, calendar);
 }

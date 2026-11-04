@@ -11,7 +11,7 @@ int main()
 	}
 	trade::CCounterReply reply;
 	reply.m_accountIndex = account;
-	reply.m_data = trade::CAccount{ account, 10000, 0, true, true };
+	reply.m_data = trade::CFunds{ account, 10000, 0, true, true };
 	CRequest wire;
 	trade::protocol::WriteReply(reply, wire);
 	if (account != AccountIndex(wire.GetData().counter_reply().funds()))

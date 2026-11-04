@@ -11,16 +11,16 @@ public:
 	trade::CResult Start(std::int64_t nNow);
 	void Stop();
 	trade::CResult Renew();
-	trade::CResult AddAccount(const _TyAccount& accountIndex, std::int64_t nInitialBalance);
+	trade::CResult AddAccount(const _TyAccount& account, std::int64_t nInitialBalance);
 	trade::CResult ImportRules(const std::vector<trade::CRule>& rules, const std::vector<trade::CCalendar>& calendar);
 	trade::CCounterReply Execute(const trade::CReqParam& request, std::int64_t nNow);
 	trade::CResult OnDepth(trade::CDepth depth, std::int64_t nNow);
 	void OnMarketState(bool bAvailable);
 	void ForgetDepth(const std::string& security);
 	trade::CResult Advance(std::int64_t nNow);
-	trade::CAccountData Snapshot(const _TyAccount& accountIndex, std::int64_t nNow) const;
+	trade::CAccountData Snapshot(const _TyAccount& account, std::int64_t nNow) const;
 	std::vector<trade::CCountEvent> EventsAfter(std::uint64_t nSequence) const;
-	std::vector<trade::CAccount> Accounts() const;
+	std::vector<trade::CFunds> Accounts() const;
 	bool Ready() const;
 	std::uint64_t Version() const;
 

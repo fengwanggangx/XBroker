@@ -140,7 +140,7 @@ namespace
 				switch (request.GetOperation())
 				{
 				case Operation::Funds:
-					reply.m_data = CAccount{ TestAccount(1), 1000000, 0, true, true };
+					reply.m_data = CFunds{ TestAccount(1), 1000000, 0, true, true };
 					break;
 				case Operation::Positions:
 					reply.m_data = std::vector<CPosition>{};
@@ -544,8 +544,8 @@ namespace
 	void IncrementalState()
 	{
 		CState state;
-		state.m_accounts.emplace(TestAccount(1), CAccount{ TestAccount(1), 100000, 0, true, true });
-		state.m_accounts.emplace(TestAccount(2), CAccount{ TestAccount(2), 200000, 0, true, true });
+		state.m_accounts.emplace(TestAccount(1), CFunds{ TestAccount(1), 100000, 0, true, true });
+		state.m_accounts.emplace(TestAccount(2), CFunds{ TestAccount(2), 200000, 0, true, true });
 		std::string strBefore = EncodeState(state);
 		{
 			CStateEdit edit(state);
@@ -565,7 +565,7 @@ namespace
 		cache.m_account.m_accountIndex = TestAccount(1);
 		CCountEvent event;
 		event.m_accountIndex = TestAccount(1);
-		event.m_account = state.m_accounts.at(TestAccount(1));
+		event.m_funds = state.m_accounts.at(TestAccount(1));
 		event.m_kind = EventTy::Order;
 		event.m_order.m_orderId = 1;
 		event.m_order.m_accountIndex = TestAccount(1);

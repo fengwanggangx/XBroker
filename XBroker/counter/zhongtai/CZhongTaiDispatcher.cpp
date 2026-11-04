@@ -225,7 +225,7 @@ bool CZhongTaiDispatcher::Persist(CSession& session)
 		CCountEvent invalid;
 		invalid.m_accountIndex = session.m_account;
 		invalid.m_kind = EventTy::Session;
-		invalid.m_account = session.m_snapshot.m_account;
+		invalid.m_funds = session.m_snapshot.m_account;
 		invalid.m_sequence = 0;
 		std::shared_ptr<CZhongTaiSession> counter = session.m_counter.lock();
 		if (nullptr != counter && session.m_published)
@@ -240,7 +240,7 @@ bool CZhongTaiDispatcher::Persist(CSession& session)
 void CZhongTaiDispatcher::Publish(CSession& session, CCountEvent event)
 {
 	event.m_accountIndex = session.m_account;
-	event.m_account = session.m_snapshot.m_account;
+	event.m_funds = session.m_snapshot.m_account;
 	event.m_bAccountValid = true;
 	event.m_sequence = session.m_journal.sequence() + 1;
 	session.m_journal.set_sequence(event.m_sequence);
@@ -345,7 +345,7 @@ void CZhongTaiDispatcher::Fail(CSession& session, const CResult& result, bool di
 		}
 		catch (...)
 		{
-			event.m_account = session.m_snapshot.m_account;
+			event.m_funds = session.m_snapshot.m_account;
 			event.m_accountIndex = session.m_account;
 			event.m_sequence = 0;
 			std::shared_ptr<CZhongTaiSession> counter = session.m_counter.lock();

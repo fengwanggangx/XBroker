@@ -86,7 +86,7 @@ namespace trade
 		std::int64_t m_nTotal{ 0 }, m_nAvailable{ 0 }, m_nFrozen{ 0 }, m_nToday{ 0 }, m_nCost{ 0 };
 		bool m_bFrozenKnown{ true }, m_bCostKnown{ true };
 	};
-	struct CAccount
+	struct CFunds
 	{
 		_TyAccount m_accountIndex{};
 		std::int64_t m_nBalance{ 0 }, m_nFrozen{ 0 };
@@ -116,7 +116,7 @@ namespace trade
 		EventTy m_kind{ EventTy::Session };
 		COrder m_order;
 		CTrade m_trade;
-		CAccount m_account;
+		CFunds m_funds;
 		CPosition m_position;
 		bool m_bAccountValid{ true };
 	};
@@ -190,7 +190,7 @@ namespace trade
 		bool m_bReady{ false };
 		std::uint64_t m_version{ 0 };
 		std::int64_t m_nTime{ 0 };
-		CAccount m_account;
+		CFunds m_account;
 		std::vector<CPosition> m_positions;
 		std::vector<COrder> m_orders;
 		std::vector<CTrade> m_trades;
@@ -199,7 +199,7 @@ namespace trade
 	{
 		std::uint64_t m_orderId{ 0 };
 	};
-	using _TyCounterReplyData = std::variant<std::monostate, COperationReceipt, CAccount, std::vector<CPosition>, std::vector<COrder>, std::vector<CTrade>>;
+	using _TyCounterReplyData = std::variant<std::monostate, COperationReceipt, CFunds, std::vector<CPosition>, std::vector<COrder>, std::vector<CTrade>>;
 	struct CCounterReply
 	{
 		std::uint64_t m_requestId{ 0 };
@@ -239,7 +239,7 @@ namespace trade
 	{
 		std::uint64_t m_nextOrder{ 1 }, m_nextTrade{ 1 }, m_sequence{ 0 };
 		int m_nSettledDay{ 0 }, m_nClosedDay{ 0 };
-		std::map<_TyAccount, CAccount> m_accounts;
+		std::map<_TyAccount, CFunds> m_accounts;
 		std::map<std::pair<_TyAccount, std::string>, CPosition> m_positions;
 		std::map<std::uint64_t, COrder> m_orders;
 		std::map<std::uint64_t, CTrade> m_trades;

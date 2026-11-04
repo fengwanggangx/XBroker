@@ -41,7 +41,7 @@ CSimulatedDispatcher::~CSimulatedDispatcher()
 	Stop();
 }
 
-trade::CResult CSimulatedDispatcher::Start(std::unique_ptr<trade::ICounterStore> store, _TyClock&& clock, const std::vector<trade::CAccount>& accounts, const std::vector<trade::CRule>& rules, const std::vector<trade::CCalendar>& calendar)
+trade::CResult CSimulatedDispatcher::Start(std::unique_ptr<trade::ICounterStore> store, _TyClock&& clock, const std::vector<trade::CFunds>& accounts, const std::vector<trade::CRule>& rules, const std::vector<trade::CCalendar>& calendar)
 {
 	std::lock_guard<std::mutex> lifecycleLock(m_mtx_lifecycle);
 	if (m_worker.joinable())
@@ -302,14 +302,14 @@ void CSimulatedDispatcher::Run()
 	Refresh();
 }
 
-trade::CAccountData CSimulatedDispatcher::Snapshot(const _TyAccount& accountIndex) const
+trade::CAccountData CSimulatedDispatcher::Snapshot(const _TyAccount& account) const
 {
 	std::lock_guard<std::mutex> lock(m_mtx_state);
-	auto iter = m_snapshots.find(accountIndex);
-	if (!IsAccountValid(accountIndex) || m_snapshots.end() == iter)
+	auto iter = m_snapshots.find(account);
+	if (!IsAccountValid(account) || m_snapshots.end() == iter)
 	{
 		trade::CAccountData data;
-		data.m_account.m_accountIndex = accountIndex;
+		data.m_account.m_accountIndex = account;
 		return data;
 	}
 	return iter->second;

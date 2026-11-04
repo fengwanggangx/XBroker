@@ -71,7 +71,7 @@ namespace trade::protocol
 		std::size_t nDot = strValue.rfind('.');
 		return std::string::npos == nDot ? CSecurity{} : CSecurity(strValue.substr(0, nDot), ParseMarket(strValue.substr(nDot + 1)));
 	}
-	void WriteFunds(const CAccount& row, bool bReady, request::TradeAccountInfo& wire)
+	void WriteFunds(const CFunds& row, bool bReady, request::TradeAccountInfo& wire)
 	{
 		SetAccountIdentity(row.m_accountIndex, wire);
 		wire.set_balance(row.m_nBalance);
@@ -105,7 +105,7 @@ namespace trade::protocol
 				{
 					wire.mutable_receipt()->set_order_id(value.m_orderId);
 				}
-				else if constexpr (std::is_same_v<T, CAccount>)
+				else if constexpr (std::is_same_v<T, CFunds>)
 				{
 					WriteFunds(value, true, *wire.mutable_funds());
 					wire.mutable_funds()->set_server_time_ms(wire.server_time_ms());
@@ -144,12 +144,12 @@ namespace trade::protocol
 		wire.set_request_id(event.m_requestId);
 		SetAccountIdentity(event.m_accountIndex, wire);
 		wire.set_kind(static_cast<int>(event.m_kind));
-		wire.set_connected(event.m_account.m_bConnected);
+		wire.set_connected(event.m_funds.m_bConnected);
 		wire.set_extended_fields(true);
 		wire.set_account_valid(event.m_bAccountValid);
 		if (event.m_bAccountValid)
 		{
-			WriteFunds(event.m_account, true, *wire.mutable_account_snapshot());
+			WriteFunds(event.m_funds, true, *wire.mutable_account_snapshot());
 		}
 		switch (event.m_kind)
 		{
@@ -163,7 +163,7 @@ namespace trade::protocol
 			WritePosition(event.m_position, *wire.mutable_position());
 			break;
 		case EventTy::Funds:
-			WriteFunds(event.m_account, true, *wire.mutable_funds());
+			WriteFunds(event.m_funds, true, *wire.mutable_funds());
 			break;
 		default:
 			break;
@@ -215,7 +215,7 @@ namespace trade::protocol
 		{
 			push.SetType(_TyRequest::TRADE_ACCOUNT_INFO_PUSH);
 			request::TradeAccountInfo rows;
-			WriteFunds(event.m_account, true, rows);
+			WriteFunds(event.m_funds, true, rows);
 			push.SetData(rows);
 		}
 		break;
@@ -231,7 +231,7 @@ namespace trade::protocol
 		if (event.m_bAccountValid)
 		{
 			request::TradeAccountInfo funds;
-			WriteFunds(event.m_account, true, funds);
+			WriteFunds(event.m_funds, true, funds);
 			push.SetEventAccount(funds);
 		}
 		return push;

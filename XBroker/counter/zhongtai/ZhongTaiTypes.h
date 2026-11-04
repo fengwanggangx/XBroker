@@ -41,7 +41,7 @@ namespace trade::zhongtai
 		COrder m_order;
 		CTrade m_trade;
 		CPosition m_position;
-		CAccount m_funds;
+		CFunds m_funds;
 	};
 	struct CLoginReply
 	{

@@ -9,7 +9,7 @@ namespace trade::protocol
 	void WriteOrder(const COrder& row, request::TradeOrderRecord& wire);
 	void WriteTrade(const CTrade& row, request::TradeRecord& wire);
 	void WritePosition(const CPosition& row, request::TradePositionRecord& wire);
-	void WriteFunds(const CAccount& row, bool bReady, request::TradeAccountInfo& wire);
+	void WriteFunds(const CFunds& row, bool bReady, request::TradeAccountInfo& wire);
 	void WriteReply(const CCounterReply& reply, ::CRequest& response);
 	void WriteEvent(const CCountEvent& event, request::TradeEventRecord& wire);
 	::CRequest Push(const CCountEvent& event, const CTradeAccountInfo& account);

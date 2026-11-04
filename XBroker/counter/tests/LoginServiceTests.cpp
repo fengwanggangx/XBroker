@@ -43,7 +43,7 @@ class CLoginServiceTests
 		{
 			trade::CCountEvent event;
 			event.m_accountIndex = account;
-			event.m_account.m_bConnected = connected;
+			event.m_funds.m_bConnected = connected;
 			m_events(event);
 		}
 

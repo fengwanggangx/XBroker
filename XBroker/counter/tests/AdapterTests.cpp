@@ -50,7 +50,7 @@ public:
 				event.m_order = params->m_order;
 			}
 			event.m_order.m_orderId = 123;
-			event.m_account = { request.m_accountIndex, 10000, 0, true, true };
+			event.m_funds = { request.m_accountIndex, 10000, 0, true, true };
 			m_handler(event);
 			trade::CCounterReply reply;
 			reply.m_requestId = request.m_requestId;
