@@ -23,7 +23,17 @@ namespace trade::zhongtai
 			m_stopped = true;
 			m_pDispatcher = nullptr;
 			m_handler = {};
+			m_handler_reply = {};
 			m_snapshot.m_bReady = false;
+		}
+	}
+
+	void CZhongTaiSession::SetReplyHandler(_TyReplyHandler handler)
+	{
+		std::lock_guard<std::mutex> lock(m_mtx_state);
+		if (!m_stopped)
+		{
+			m_handler_reply = std::move(handler);
 		}
 	}
 
@@ -36,14 +46,14 @@ namespace trade::zhongtai
 		}
 	}
 
-	CResult CZhongTaiSession::SendRequest(CReqParam request, _TyReplyHandler handler)
+	CResult CZhongTaiSession::SendRequest(CReqParam request)
 	{
 		std::lock_guard<std::mutex> lock(m_mtx_state);
 		if (m_stopped || m_account != request.m_accountIndex)
 		{
 			return { Error::Rejected, "stopped counter or account mismatch" };
 		}
-		return m_pDispatcher->Send(std::move(request), std::move(handler), m_instance);
+		return m_pDispatcher->Send(std::move(request), m_handler_reply, m_instance);
 	}
 
 	CAccountData CZhongTaiSession::Snapshot() const
@@ -76,7 +86,9 @@ namespace trade::zhongtai
 		{
 			try
 			{
-				handler(event);
+				CCountEvent sourceEvent = event;
+				sourceEvent.m_sessionId = GetId();
+				handler(sourceEvent);
 			}
 			catch (...)
 			{

@@ -10,10 +10,12 @@ namespace net
 	class CTcpServer;
 }
 class CSession;
+class CTradeService;
+class CBrokerCenter;
 
 class CBootLoader final
 {
-	public:
+public:
 	CBootLoader();
 	~CBootLoader();
 	CBootLoader(const CBootLoader& arg) = delete;
@@ -27,13 +29,15 @@ class CBootLoader final
 	const std::string& GetLastError() const;
 	int GetErrorCode() const;
 
-	private:
+private:
 	bool Fail(int nErrorCode, const std::string& strMessage);
 	std::filesystem::path m_exec;
 	std::string m_strLastError;
 	int m_nErrorCode{ 0 };
 	bool m_bInitialized{ false };
 	bool m_bDatabaseInitialized{ false };
+	std::unique_ptr<CTradeService> m_pTradeService;
+	std::unique_ptr<CBrokerCenter> m_pCenter;
 	std::unique_ptr<CSession> m_pMarket;
 	std::unique_ptr<net::CTcpServer> m_pTcpServer;
 };

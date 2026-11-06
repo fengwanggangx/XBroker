@@ -267,6 +267,7 @@ void CZhongTaiDispatcher::Reply(CSession& session, CWork& work, const CResult& r
 	CCounterReply reply;
 	reply.m_accountIndex = session.m_account;
 	reply.m_requestId = work.m_request.m_requestId;
+	reply.m_correlationId = work.m_request.m_correlationId;
 	reply.m_operation = work.m_request.GetOperation();
 	reply.m_result = result;
 	reply.m_version = session.m_journal.sequence();
@@ -432,6 +433,7 @@ void CZhongTaiDispatcher::Handle(CWork work)
 		CCounterReply reply;
 		reply.m_accountIndex = account;
 		reply.m_requestId = work.m_request.m_requestId;
+		reply.m_correlationId = work.m_request.m_correlationId;
 		reply.m_operation = operation;
 		reply.m_result = { Error::Unavailable, "retired account session" };
 		Invoke(work.m_handler, reply);
@@ -488,6 +490,7 @@ void CZhongTaiDispatcher::Handle(CWork work)
 		CCounterReply reply;
 		reply.m_accountIndex = account;
 		reply.m_requestId = work.m_request.m_requestId;
+		reply.m_correlationId = work.m_request.m_correlationId;
 		reply.m_operation = operation;
 		reply.m_result = { Error::NotFound, "XTP account not logged in" };
 		Invoke(work.m_handler, reply);
@@ -1229,6 +1232,7 @@ void CZhongTaiDispatcher::Run()
 				fallback = incoming->m_handler;
 				failure.m_accountIndex = incoming->m_request.m_accountIndex;
 				failure.m_requestId = incoming->m_request.m_requestId;
+				failure.m_correlationId = incoming->m_request.m_correlationId;
 				failure.m_operation = incoming->m_request.GetOperation();
 			}
 		}

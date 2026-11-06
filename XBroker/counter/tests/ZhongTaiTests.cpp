@@ -1,3 +1,4 @@
+#include "SessionTestTools.h"
 #include "../zhongtai/CZhongTaiDispatcher.h"
 #include "../zhongtai/ZhongTaiConvert.h"
 #include <future>
@@ -230,15 +231,18 @@ namespace
 	};
 	CCounterReply Send(const std::shared_ptr<ITradeSession>& counter, CReqParam request)
 	{
+		request.m_correlationId = 987654;
 		std::shared_ptr<std::promise<CCounterReply>> promise = std::make_shared<std::promise<CCounterReply>>();
 		std::future<CCounterReply> future = promise->get_future();
-		Check(counter->SendRequest(std::move(request), [promise](const CCounterReply& reply)
+		Check(countertest::SendRequest(*counter, std::move(request), [promise](const CCounterReply& reply)
 		{
 			promise->set_value(reply);
 		}).Ok(),
-			"request enqueued");
+			  "request enqueued");
 		Check(std::future_status::ready == future.wait_for(std::chrono::seconds(4)), "request callback completed");
-		return future.get();
+		CCounterReply reply = future.get();
+		Check(987654 == reply.m_correlationId, "XTP reply preserves internal correlation");
+		return reply;
 	}
 
 	CReqParam Request(const _TyAccount& account, Operation operation)
@@ -441,27 +445,27 @@ namespace
 		Check(Send(first, Request(a, Operation::Login)).m_result.Ok(), "lifecycle first login");
 		Check(Send(second, Request(b, Operation::Login)).m_result.Ok(), "lifecycle second login");
 		std::atomic_int rejectedCallbacks{ 0 };
-		Check(!first->SendRequest(Request(b, Operation::Funds), [&rejectedCallbacks](const CCounterReply&)
+		Check(!countertest::SendRequest(*first, Request(b, Operation::Funds), [&rejectedCallbacks](const CCounterReply&)
 		{
 			++rejectedCallbacks;
 		}).Ok() && 0 == rejectedCallbacks.load(),
-			"mismatch rejected without callback");
+			  "mismatch rejected without callback");
 		Check(Send(first, Request(a, Operation::Disconnect)).m_result.Ok(), "business disconnect acknowledged");
 		first->Close();
-		Check(!first->Snapshot().m_bReady && !first->SendRequest(Request(a, Operation::Funds), {}).Ok(), "closed account unavailable");
+		Check(!first->Snapshot().m_bReady && !countertest::SendRequest(*first, Request(a, Operation::Funds), {}).Ok(), "closed account unavailable");
 		Check(Send(second, Request(b, Operation::Funds)).m_result.Ok(), "closing first preserves shared dispatcher");
 		std::shared_ptr<ITradeSession> replacement = dispatcher->Create({ a, "zhongtai_xtp" });
 		Check(Send(replacement, Request(a, Operation::Login)).m_result.Ok(), "replacement account login");
-		Check(!first->SendRequest(Request(a, Operation::Submit), {}).Ok(), "retired account cannot send");
+		Check(!countertest::SendRequest(*first, Request(a, Operation::Submit), {}).Ok(), "retired account cannot send");
 		dispatcher->Stop();
-		Check(!second->SendRequest(Request(b, Operation::Funds), [&rejectedCallbacks](const CCounterReply&)
+		Check(!countertest::SendRequest(*second, Request(b, Operation::Funds), [&rejectedCallbacks](const CCounterReply&)
 		{
 			++rejectedCallbacks;
 		}).Ok() && 0 == rejectedCallbacks.load(),
-			"stopped dispatcher rejects without callback");
+			  "stopped dispatcher rejects without callback");
 		Check(nullptr == dispatcher->Create({ a, "zhongtai_xtp" }), "stopped dispatcher cannot create sessions");
 		dispatcher.reset();
-		Check(!replacement->SendRequest(Request(a, Operation::Funds), {}).Ok() && !replacement->Snapshot().m_bReady, "session remains safely closed after dispatcher destruction");
+		Check(!countertest::SendRequest(*replacement, Request(a, Operation::Funds), {}).Ok() && !replacement->Snapshot().m_bReady, "session remains safely closed after dispatcher destruction");
 	}
 
 	void DispatcherDestruction()
@@ -474,7 +478,7 @@ namespace
 			dispatcher.Start();
 			session = dispatcher.Create({ account, "zhongtai_xtp" });
 		}
-		Check(!session->SendRequest(Request(account, Operation::Funds), {}).Ok() && !session->Snapshot().m_bReady, "session detached by dispatcher destructor");
+		Check(!countertest::SendRequest(*session, Request(account, Operation::Funds), {}).Ok() && !session->Snapshot().m_bReady, "session detached by dispatcher destructor");
 		session->Close();
 	}
 

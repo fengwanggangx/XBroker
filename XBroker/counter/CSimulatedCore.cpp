@@ -704,6 +704,7 @@ trade::CCounterReply CSimulatedCore::Execute(const trade::CReqParam& request, st
 {
 	trade::CCounterReply reply;
 	reply.m_requestId = request.m_requestId;
+	reply.m_correlationId = request.m_correlationId;
 	reply.m_accountIndex = request.m_accountIndex;
 	trade::Operation operation = request.GetOperation();
 	reply.m_operation = operation;

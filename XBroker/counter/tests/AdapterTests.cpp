@@ -1,3 +1,4 @@
+#include "SessionTestTools.h"
 #include "../../service/CCounterFactory.h"
 #include <deque>
 #include <iostream>
@@ -37,11 +38,12 @@ static trade::_TyRequestParam MakeParams(trade::Operation operation)
 class CDeferredBroker final : public trade::ITradeSession
 {
 public:
-	trade::CResult SendRequest(trade::CReqParam request, _TyReplyHandler handler) override
+	trade::CResult SendRequest(trade::CReqParam request) override
 	{
-		m_work.emplace_back([this, request = std::move(request), handler = std::move(handler)]()
+		m_work.emplace_back([this, request = std::move(request), handler = m_handler_reply]()
 		{
 			trade::CCountEvent event;
+			event.m_sessionId = GetId();
 			event.m_accountIndex = request.m_accountIndex;
 			event.m_requestId = request.m_requestId;
 			event.m_kind = trade::Operation::Submit == request.GetOperation() ? trade::EventTy::Order : trade::EventTy::Session;
@@ -54,6 +56,7 @@ public:
 			m_handler(event);
 			trade::CCounterReply reply;
 			reply.m_requestId = request.m_requestId;
+			reply.m_correlationId = request.m_correlationId;
 			reply.m_accountIndex = request.m_accountIndex;
 			reply.m_operation = request.GetOperation();
 			reply.m_data = trade::COperationReceipt{ event.m_order.m_orderId };
@@ -71,6 +74,10 @@ public:
 			work();
 		}
 	}
+	void SetReplyHandler(_TyReplyHandler handler) override
+	{
+		m_handler_reply = std::move(handler);
+	}
 	void SetEventHandler(_TyEventHandler handler) override
 	{
 		m_handler = std::move(handler);
@@ -85,6 +92,7 @@ public:
 	}
 
 private:
+	_TyReplyHandler m_handler_reply;
 	std::deque<std::function<void()>> m_work;
 	_TyEventHandler m_handler;
 };
@@ -119,7 +127,7 @@ int main()
 		trade::CReqParam request;
 		request.m_accountIndex = TestAccount(7);
 		request.m_param = MakeParams(operation);
-		if (!gateway->SendRequest(std::move(request), [&nReplies](const trade::CCounterReply& reply)
+		if (!countertest::SendRequest(*gateway, std::move(request), [&nReplies](const trade::CCounterReply& reply)
 		{
 			if (reply.m_result.Ok())
 			{

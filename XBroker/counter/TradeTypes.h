@@ -119,6 +119,7 @@ namespace trade
 		CFunds m_funds;
 		CPosition m_position;
 		bool m_bAccountValid{ true };
+		std::uint64_t m_sessionId{ 0 }; // Source session identity; not serialized or persisted.
 	};
 	struct CLoginParam
 	{
@@ -176,6 +177,7 @@ namespace trade
 		std::uint64_t m_requestId{ 0 };
 		_TyAccount m_accountIndex{};
 		_TyRequestParam m_param{ CFundsQueryParam{} };
+		std::uint64_t m_correlationId{ 0 }; // XBroker-local pending key; never serialized.
 
 		Operation GetOperation() const
 		{
@@ -209,6 +211,7 @@ namespace trade
 		std::uint64_t m_version{ 0 };
 		std::int64_t m_nTime{ 0 };
 		_TyCounterReplyData m_data;
+		std::uint64_t m_correlationId{ 0 };
 	};
 	struct CRule
 	{

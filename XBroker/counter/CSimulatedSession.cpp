@@ -16,6 +16,16 @@ void CSimulatedSession::Close()
 	m_closed = true;
 	m_pDispatcher = nullptr;
 	m_handler = {};
+	m_handler_reply = {};
+}
+
+void CSimulatedSession::SetReplyHandler(_TyReplyHandler handler)
+{
+	std::lock_guard<std::mutex> lock(m_mtx_state);
+	if (!m_closed)
+	{
+		m_handler_reply = std::move(handler);
+	}
 }
 
 void CSimulatedSession::SetEventHandler(_TyEventHandler handler)
@@ -37,14 +47,14 @@ trade::CAccountData CSimulatedSession::Snapshot() const
 	return m_pDispatcher->IsCurrent(m_account, m_instance) ? m_pDispatcher->Snapshot(m_account) : trade::CAccountData{};
 }
 
-trade::CResult CSimulatedSession::SendRequest(trade::CReqParam request, _TyReplyHandler handler)
+trade::CResult CSimulatedSession::SendRequest(trade::CReqParam request)
 {
 	std::lock_guard<std::mutex> lock(m_mtx_state);
 	if (m_closed || m_account != request.m_accountIndex)
 	{
 		return { trade::Error::Rejected, "closed session or account mismatch" };
 	}
-	return m_pDispatcher->Send(std::move(request), std::move(handler), m_instance);
+	return m_pDispatcher->Send(std::move(request), m_handler_reply, m_instance);
 }
 
 void CSimulatedSession::Publish(const trade::CCountEvent& event)
@@ -60,6 +70,8 @@ void CSimulatedSession::Publish(const trade::CCountEvent& event)
 	}
 	if (nullptr != handler)
 	{
-		handler(event);
+		trade::CCountEvent sourceEvent = event;
+		sourceEvent.m_sessionId = GetId();
+		handler(sourceEvent);
 	}
 }

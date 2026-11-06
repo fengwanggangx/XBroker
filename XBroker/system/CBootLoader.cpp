@@ -1,5 +1,7 @@
 #include "CBootLoader.h"
 #include "CSession.h"
+#include "CBrokerCenter.h"
+#include "../service/CTradeService.h"
 #include "../database/CDBEngine.h"
 #include "../database/IDataBase.h"
 #include "../ini/CINIHandler.h"
@@ -67,6 +69,20 @@ bool CBootLoader::Initialize()
 
 	m_pMarket = std::make_unique<CSession>(login);
 	m_pTcpServer = std::make_unique<net::CTcpServer>(nPort);
+	m_pTradeService = std::make_unique<CTradeService>();
+	m_pCenter = std::make_unique<CBrokerCenter>(m_pTradeService.get());
+	m_pCenter->SetMarketHandler(std::bind_front(&CSession::SendRequest, m_pMarket.get()));
+	if (!m_pCenter->Initialize())
+	{
+		return Fail(7, m_pCenter->GetLastError());
+	}
+	if (!m_pTradeService->Initialize())
+	{
+		return Fail(7, m_pTradeService->GetLastError());
+	}
+	m_pTcpServer->RegisterHandler(std::bind_front(&CBrokerCenter::OnClientNetEvent, m_pCenter.get()));
+	m_pMarket->RegisterHandler(std::bind_front(&CBrokerCenter::OnHQMarketReply, m_pCenter.get()));
+	m_pMarket->RegisterStateHandler(std::bind_front(&CBrokerCenter::OnHQMarketState, m_pCenter.get()));
 	m_bInitialized = true;
 	return true;
 }
@@ -103,8 +119,22 @@ void CBootLoader::Finalize()
 	if (nullptr != m_pMarket)
 	{
 		m_pMarket->Stop();
+		m_pMarket->ClearHandlers();
 	}
-	// The request service is destroyed before the endpoints and database.
+	if (nullptr != m_pTcpServer)
+	{
+		m_pTcpServer->ClearHandlers();
+	}
+	if (nullptr != m_pTradeService)
+	{
+		m_pTradeService->Stop();
+	}
+	if (nullptr != m_pCenter)
+	{
+		m_pCenter->Stop();
+	}
+	m_pCenter.reset();
+	m_pTradeService.reset();
 	m_pTcpServer.reset();
 	m_pMarket.reset();
 	if (m_bDatabaseInitialized)

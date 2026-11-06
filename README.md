@@ -40,7 +40,7 @@ python tests/check_contracts.py
 
 `tests/service_integration.py` 通过 `--ledger-fixture` 接收预置账本 SQL（包含表结构），使用券商1/default/000123、券商1/other/000123、券商2/default/000123、券商1/default/123，初始余额依次为10000000、20000000、30000000、40000000分。
 
-交易适配器统一返回绑定单个账户的 `ITradeSession`：通过 `SendRequest()` 接收请求、`Snapshot()` 读取本账户快照、`SetEventHandler()` 接收事件。`Close()` 仅清理会话资源；业务退出先发送断开请求，成功后关闭会话。模拟账户存在活动委托时仍拒绝断开。
+交易适配器统一返回绑定单个账户的 `ITradeSession`：通过 `SetReplyHandler()` 一次注册响应入口，通过 `SendRequest(param)` 接收请求、`Snapshot()` 读取本账户快照、`SetEventHandler()` 接收事件。`Close()` 仅清理会话资源；业务退出先发送断开请求，成功后关闭会话。模拟账户存在活动委托时仍拒绝断开。
 
 模拟实现由 `CSimulatedSession → CSimulatedDispatcher → CSimulatedCore` 组成；中泰实现由 `CZhongTaiSession → CZhongTaiDispatcher → IZhongTaiApi` 组成。每个账户一个 Session，同种适配器共享显式创建的 Dispatcher，不使用模拟柜台全局单例。Dispatcher 管理队列、工作线程、状态和持久化，服务停止时统一 `Stop()`。会话实例号隔离旧请求与回报。
 
@@ -50,6 +50,12 @@ python tests/check_contracts.py
 
 中泰传统 XTP 2.2.50.8 原生接入见 [中泰适配器说明](XBroker/counter/zhongtai/README.md)。默认禁用，通过 `XBROKER_ENABLE_XTP` 和独立 SDK 路径启用；不自动连接或交易。
 
-Dispatcher 由 `CBrokerService` 以 `unique_ptr` 独占，Session 与工厂、行情回调只借用裸指针。退出调用 `CBrokerService::Stop()`：停止 TCP 并排空请求，停止行情线程并清除回调，关闭账户会话，停止 Dispatcher 并等待工作线程和 SDK 回调结束，清理工厂和账户引用，最后销毁 Dispatcher。Dispatcher 自身退出也会关闭残留 Session 并清空其裸指针，关闭后的 Session 不再访问 Dispatcher。
+`CBootLoader` 创建并持有 TCP 服务、HQMarket Session、`CTradeService` 和 `CBrokerCenter`。中心只借用交易服务指针，统一接收终端请求、HQMarket 响应以及柜台响应和事件，负责认证、心跳、业务转发、响应回包和事件广播。交易服务不直接发送网络消息，通过中心绑定的回调提交响应、推送和行情订阅需求。
 
-Dispatcher 各自提供 `Initialize()`：模拟柜台读取并校验 `Trade.rules_path`，创建存储并启动工作线程；中泰柜台读取并校验 `Trade.zhongtai_path`，创建 API、存储并启动工作线程。未配置中泰路径时初始化成功但不启动、不注册中泰适配器。`CBrokerService` 负责创建和持有 Dispatcher、注册工厂及连接外部行情回调；测试仍可注入 API、存储和时钟后调用 `Start()`。
+Dispatcher 由 `CTradeService` 以 `unique_ptr` 独占，交易服务负责初始化模拟和中泰柜台、注册工厂并管理账户 Session。HQMarket 行情与状态由中心转交交易服务，再传入模拟 Dispatcher。Dispatcher 各自校验配置并启动；未配置中泰路径时不注册中泰适配器。
+
+退出由 BootLoader 统一协调：关闭 TCP 并排空终端请求，停止 HQMarket 并排空回调，清除网络处理器，停止交易服务（关闭账户 Session、停止柜台并等待回调、清理工厂与账户引用、销毁 Dispatcher），最后解绑并销毁中心、交易服务、网络端点和数据库。
+
+交易服务通过 pending 表管理柜台请求，记录原连接、原请求 ID、账户、操作类型和截止时间；不保存密码或逐请求回调。每笔请求分配单调递增的内部 `m_correlationId`，柜台原样返回，原业务 `m_requestId/source_request_id` 保持不变。关联 ID 仅用于 XBroker 内部，不写入网络协议或持久化账本。响应统一经中心转交交易服务，按关联 ID 和账户、操作匹配并移除 pending；重复、迟到或不匹配的回包不再完成请求。pending 上限 4096，普通请求 30 秒、登录 120 秒到期；维护线程每 250 毫秒检查。报撤单超时返回结果未知，需查询核对，不自动重发。停止时先排空柜台回调，再失败完成剩余 pending。
+
+`ITradeSession::GetId()` 返回对象生命周期内固定的进程内会话 ID，创建新 Session 时分配新 ID，关闭后保持不变。模拟和中泰 Session 在发布事件时设置 `CCountEvent::m_sessionId`。事件入口统一只传 `CCountEvent`，中心转交交易服务后，用事件账户查当前 Session，再核对 ID，丢弃旧会话或缺少 ID 的事件；不再额外绑定账户和 Session 弱引用。会话 ID 只在 XBroker 内使用，不写入网络协议及持久化账本。

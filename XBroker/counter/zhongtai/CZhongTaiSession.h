@@ -12,7 +12,8 @@ namespace trade::zhongtai
 		~CZhongTaiSession() override;
 		void Close() override;
 		void SetEventHandler(_TyEventHandler handler) override;
-		CResult SendRequest(CReqParam request, _TyReplyHandler handler) override;
+		void SetReplyHandler(_TyReplyHandler handler) override;
+		CResult SendRequest(CReqParam request) override;
 		CAccountData Snapshot() const override;
 		void Publish(const CCountEvent& event);
 		void SetSnapshot(const CAccountData& snapshot);
@@ -24,6 +25,7 @@ namespace trade::zhongtai
 		mutable std::mutex m_mtx_state;
 		CAccountData m_snapshot;
 		_TyEventHandler m_handler;
+		_TyReplyHandler m_handler_reply;
 		bool m_stopped{ false };
 	};
 } // namespace trade::zhongtai

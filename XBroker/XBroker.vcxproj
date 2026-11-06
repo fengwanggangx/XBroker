@@ -205,8 +205,8 @@
     <ClCompile Include="service\CTradeService.cpp" />
     <ClInclude Include="service\CTradeService.h" />
     <ClInclude Include="service\CCounterFactory.h" />
-    <ClCompile Include="system\CBrokerService.cpp" />
-    <ClInclude Include="system\CBrokerService.h" />
+    <ClCompile Include="system\CBrokerCenter.cpp" />
+    <ClInclude Include="system\CBrokerCenter.h" />
     <ClCompile Include="system\CBootLoader.cpp" />
     <ClInclude Include="system\CBootLoader.h" />
     <ClCompile Include="system\CHostMgr.cpp" />

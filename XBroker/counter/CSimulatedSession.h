@@ -13,7 +13,8 @@ public:
 	void Close() override;
 	trade::CAccountData Snapshot() const override;
 	void SetEventHandler(_TyEventHandler handler) override;
-	trade::CResult SendRequest(trade::CReqParam request, _TyReplyHandler handler) override;
+	void SetReplyHandler(_TyReplyHandler handler) override;
+	trade::CResult SendRequest(trade::CReqParam request) override;
 	void Publish(const trade::CCountEvent& event);
 
 private:
@@ -22,5 +23,6 @@ private:
 	std::uint64_t m_instance;
 	mutable std::mutex m_mtx_state;
 	_TyEventHandler m_handler;
+	_TyReplyHandler m_handler_reply;
 	bool m_closed{ false };
 };

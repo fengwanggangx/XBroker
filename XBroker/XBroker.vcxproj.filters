@@ -171,7 +171,7 @@
     <ClInclude Include="service\CCounterFactory.h">
       <Filter>service</Filter>
     </ClInclude>
-    <ClInclude Include="system\CBrokerService.h">
+    <ClInclude Include="system\CBrokerCenter.h">
       <Filter>system</Filter>
     </ClInclude>
     <ClInclude Include="system\CHostMgr.h">
@@ -296,7 +296,7 @@
     <ClCompile Include="service\CTradeService.cpp">
       <Filter>service</Filter>
     </ClCompile>
-    <ClCompile Include="system\CBrokerService.cpp">
+    <ClCompile Include="system\CBrokerCenter.cpp">
       <Filter>system</Filter>
     </ClCompile>
     <ClCompile Include="system\CHostMgr.cpp">

@@ -140,6 +140,7 @@ trade::CResult CSimulatedDispatcher::Send(trade::CReqParam request, _TyReplyHand
 		trade::CCounterReply reply;
 		reply.m_accountIndex = request.m_accountIndex;
 		reply.m_requestId = request.m_requestId;
+		reply.m_correlationId = request.m_correlationId;
 		reply.m_operation = request.GetOperation();
 		try
 		{

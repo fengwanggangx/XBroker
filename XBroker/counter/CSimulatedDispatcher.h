@@ -9,7 +9,6 @@
 #include <set>
 
 class CRequest;
-class CSession;
 enum class SessionState;
 
 class CSimulatedDispatcher final : public trade::IMarketInput
@@ -38,7 +37,6 @@ public:
 	bool OnMarketResponse(const CRequest& request);
 	void OnSessionState(SessionState state, const std::string& message);
 	void SetDepthSubscriptionHandler(_TyDepthSubscriptionHandler&& handler);
-	bool ChangeDepthSubscription(CSession& session, const std::string& security, bool subscribe);
 
 private:
 	CSimulatedDispatcher(CSimulatedDispatcher&&) = delete;

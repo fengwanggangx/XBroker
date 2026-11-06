@@ -2,7 +2,6 @@
 #include "../system/CSession.h"
 #include "../common/utility.h"
 #include "../request/request.pb.h"
-#include "../request/RequestCenter.h"
 
 bool CSimulatedDispatcher::OnMarketResponse(const CRequest& request)
 {
@@ -47,15 +46,4 @@ bool CSimulatedDispatcher::OnMarketResponse(const CRequest& request)
 void CSimulatedDispatcher::OnSessionState(SessionState state, const std::string&)
 {
 	OnMarketState(SessionState::Ready == state);
-}
-
-bool CSimulatedDispatcher::ChangeDepthSubscription(CSession& session, const std::string& security, bool subscribe)
-{
-	std::size_t dot = security.rfind('.');
-	if (std::string::npos == dot)
-	{
-		return false;
-	}
-	CQuoteInfo quote(security.substr(0, dot), ParseMarket(security.substr(dot + 1)), Channel::depth);
-	return session.SendRequest(subscribe ? request::Subscription(quote) : request::UnSubscription(quote));
 }
