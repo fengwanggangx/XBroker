@@ -83,6 +83,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <RemoteCompileLocalCopyObjectFiles>true</RemoteCompileLocalCopyObjectFiles>
+    <CopyAdditionalIncludes>true</CopyAdditionalIncludes>
     <RemoteOutDir>$(RemoteProjectDir)exec/release/</RemoteOutDir>
     <LibraryPath>
     </LibraryPath>
@@ -221,9 +222,6 @@
     <None Include="libs\debug\**\*" />
     <None Include="libs\release\**\*" />
   </ItemGroup>
-  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets" />
-
   <ItemGroup>
     <ClCompile Include="counter\zhongtai\CZhongTaiApi.cpp" />
     <ClCompile Include="counter\zhongtai\CZhongTaiSession.cpp" />
@@ -237,6 +235,8 @@
     <ClInclude Include="counter\zhongtai\ZhongTaiConvert.h" />
     <ClInclude Include="counter\zhongtai\ZhongTaiTypes.h" />
   </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
   <ItemDefinitionGroup Condition="'$(XBrokerEnableXtp)'=='true'">
     <ClCompile>
       <PreprocessorDefinitions>XBROKER_ENABLE_XTP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
