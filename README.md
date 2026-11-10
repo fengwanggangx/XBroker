@@ -25,12 +25,15 @@ XBroker 是 C++20 柜台接入服务。账户身份由 `broker_id`、`site`、`a
 
 ## 验证
 
+正式服务由 `XBroker.sln` 中的 `XBroker/XBroker.vcxproj` 构建。CMake 文件保留为辅助验证配置。
+
+静态线路协议一致性检查：
+
 ```sh
-cmake -S XBroker -B /tmp/xbroker-build -DCMAKE_CXX_COMPILER=/opt/rh/gcc-toolset-15/root/usr/bin/g++
-cmake --build /tmp/xbroker-build -j3
-LD_LIBRARY_PATH="$PWD/XBroker/libs/debug" ctest --test-dir /tmp/xbroker-build --output-on-failure
 python tests/check_contracts.py
 ```
+
+脚本比较 XBroker/XEngine 的请求、行情 `.proto` 及对应生成文件，共 6 个文件；不比较内部 ITradeSession、TradeTypes 或 request 帮助函数。失败时列出缺失或不一致的文件并返回非零退出码。该检查不代表业务语义或运行验证通过。
 
 `tests/service_integration.py` 必须连接隔离 MySQL，以 `--binary --socket --mysql-port` 指定测试环境，可添加 `--xengine-binary` 验证终端协议到 XEngine/Broker 的链路。测试创建并清理自身进程命名的数据库和测试用户，使用合成行情源，不连接真实券商。
 
@@ -59,3 +62,10 @@ Dispatcher 由 `CTradeService` 以 `unique_ptr` 独占，交易服务负责初�
 交易服务通过 pending 表管理柜台请求，记录原连接、原请求 ID、账户、操作类型和截止时间；不保存密码或逐请求回调。每笔请求分配单调递增的内部 `m_correlationId`，柜台原样返回，原业务 `m_requestId/source_request_id` 保持不变。关联 ID 仅用于 XBroker 内部，不写入网络协议或持久化账本。响应统一经中心转交交易服务，按关联 ID 和账户、操作匹配并移除 pending；重复、迟到或不匹配的回包不再完成请求。pending 上限 4096，普通请求 30 秒、登录 120 秒到期；维护线程每 250 毫秒检查。报撤单超时返回结果未知，需查询核对，不自动重发。停止时先排空柜台回调，再失败完成剩余 pending。
 
 `ITradeSession::GetId()` 返回对象生命周期内固定的进程内会话 ID，创建新 Session 时分配新 ID，关闭后保持不变。模拟和中泰 Session 在发布事件时设置 `CCountEvent::m_sessionId`。事件入口统一只传 `CCountEvent`，中心转交交易服务后，用事件账户查当前 Session，再核对 ID，丢弃旧会话或缺少 ID 的事件；不再额外绑定账户和 Session 弱引用。会话 ID 只在 XBroker 内使用，不写入网络协议及持久化账本。
+
+## 正式程序构建入口
+
+正式程序统一从 Visual Studio 解决方案构建，以 `.vcxproj` 为准。仓库中的 CMake 入口仅用于辅助验证，不作为正式程序构建、发布或验收依据。
+
+打开 `XBroker.sln`，选择 `XBroker/XBroker.vcxproj`，使用 VS Linux 远程构建，配置为 Debug 或 Release、平台 x64；需在 VS 中配置 Linux 连接及工程所需依赖。
+本次仅核对解决方案及工程文件，不执行编译、链接或运行测试。
