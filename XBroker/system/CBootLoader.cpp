@@ -49,7 +49,7 @@ bool CBootLoader::Initialize()
 	login.m_bOrdered = true;
 	if (!login.Valid())
 	{
-		return Fail(5, "HQMarket endpoint and login credentials are required");
+		return Fail(3, "HQMarket endpoint and login credentials are required");
 	}
 
 	static const std::string cs_mysql = "MySQL";
@@ -60,22 +60,24 @@ bool CBootLoader::Initialize()
 	std::string strDatabase = config.GetString(ini::Config::System, cs_mysql, "database");
 	if (strMySqlHost.empty() || strMySqlUser.empty() || (0 >= nMySqlPort) || (65535 < nMySqlPort) || (0 >= nMySqlPoolSize))
 	{
-		return Fail(3, "Invalid MySQL host, user, port or pool_size in ini/system.ini");
+		return Fail(4, "Invalid MySQL host, user, port or pool_size in ini/system.ini");
 	}
 	db::CConnectParam param(strMySqlHost, static_cast<unsigned int>(nMySqlPort), strMySqlUser, config.GetString(ini::Config::System, cs_mysql, "password"), strDatabase, "utf8mb4");
 	m_bDatabaseInitialized = true;
 	if (0 != CDBEngine::InstanceRef().Initialize(db::em_database::mysql, param, nMySqlPoolSize))
 	{
-		return Fail(3, "XBroker MySQL initialization failed");
+		return Fail(5, "XBroker MySQL initialization failed");
 	}
-	bool bTablesReady = false;
 	{
 		db::_TyDBPtr database = CDBEngine::InstanceRef().GetDBPtr(db::em_database::mysql);
-		bTablesReady = nullptr != database && 0 == database->ExecSqlFile(m_exec / "sql" / "table_create.sql");
-	}
-	if (!bTablesReady)
-	{
-		return Fail(4, "Failed to initialize XBroker MySQL tables");
+		if ((nullptr == database) || (0 != database->ExecSqlFile(m_exec / "sql" / "table_create.sql")))
+		{
+			return Fail(6, "Failed to initialize XBroker MySQL tables");
+		}
+		if (0 != database->ExecSqlFile(m_exec / "sql" / "table_init.sql"))
+		{
+			return Fail(7, "Failed to execute sql/table_init.sql");
+		}
 	}
 
 	m_pMarket = std::make_unique<CSession>(login);
@@ -85,11 +87,11 @@ bool CBootLoader::Initialize()
 	m_pCenter->SetMarketHandler(std::bind_front(&CSession::SendRequest, m_pMarket.get()));
 	if (!m_pCenter->Initialize())
 	{
-		return Fail(7, m_pCenter->GetLastError());
+		return Fail(8, m_pCenter->GetLastError());
 	}
 	if (!m_pTradeService->Initialize())
 	{
-		return Fail(7, m_pTradeService->GetLastError());
+		return Fail(9, m_pTradeService->GetLastError());
 	}
 	m_pTcpServer->RegisterHandler(std::bind_front(&CBrokerCenter::OnClientNetEvent, m_pCenter.get()));
 	m_pMarket->RegisterHandler(std::bind_front(&CBrokerCenter::OnHQMarketReply, m_pCenter.get()));
@@ -102,17 +104,17 @@ bool CBootLoader::Run()
 {
 	if (!m_bInitialized || nullptr == m_pTcpServer || nullptr == m_pMarket)
 	{
-		return Fail(6, "XBroker boot loader is not initialized");
+		return Fail(10, "XBroker boot loader is not initialized");
 	}
 	if (0 != m_pTcpServer->Initialize())
 	{
-		m_nErrorCode = 6;
+		m_nErrorCode = 11;
 		m_strLastError = "XBroker TCP server initialization failed";
 		return false;
 	}
 	if (!m_pMarket->Start())
 	{
-		m_nErrorCode = 5;
+		m_nErrorCode = 12;
 		m_strLastError = "HQMarket session initialization failed";
 		return false;
 	}

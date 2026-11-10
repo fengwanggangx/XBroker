@@ -16,7 +16,7 @@ namespace
 	constexpr int StorageUnavailable = 1004;
 	constexpr std::size_t MinUserLength = 3;
 	constexpr std::size_t MaxUserLength = 64;
-	constexpr std::size_t MinPasswordLength = 8;
+	constexpr std::size_t MinPasswordLength = 6;
 	constexpr std::size_t MaxPasswordLength = 128;
 	constexpr std::chrono::hours TokenLifetime{ 24 };
 
