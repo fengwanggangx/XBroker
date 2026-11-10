@@ -31,29 +31,29 @@ bool CBootLoader::Initialize()
 	}
 
 	ini::CINIHandler& config = ini::CINIHandler::InstanceRef();
-	std::string strDatabase = config.GetValue(ini::Config::System, "MySQL", "database", std::string());
-	int nPort = config.GetValue(ini::Config::System, "Broker", "port", 9803);
+	std::string strDatabase = config.GetString(ini::Config::System, "MySQL", "database");
+	int nPort = config.GetInt(ini::Config::System, "System", "tcp_port");
 	if (strDatabase.empty() || 0 >= nPort || 65535 < nPort)
 	{
 		return Fail(2, "XBroker database and valid port are required");
 	}
 
 	CLoginInfo login;
-	login.m_strUser = config.GetValue(ini::Config::System, "HQMarket", "user", std::string());
-	login.m_strPassword = config.GetValue(ini::Config::System, "HQMarket", "password", std::string());
-	login.m_strToken = config.GetValue(ini::Config::System, "HQMarket", "token", std::string());
+	login.m_strUser = config.GetString(ini::Config::System, "HQMarket", "user");
+	login.m_strPassword = config.GetString(ini::Config::System, "HQMarket", "password");
+	login.m_strToken = config.GetString(ini::Config::System, "HQMarket", "token");
 	login.m_host.m_strName = "HQMarket";
-	login.m_host.m_strHost = config.GetValue(ini::Config::System, "HQMarket", "host", std::string("127.0.0.1"));
-	login.m_host.m_nPort = config.GetValue(ini::Config::System, "HQMarket", "port", 9901);
+	login.m_host.m_strHost = config.GetString(ini::Config::System, "HQMarket", "host");
+	login.m_host.m_nPort = config.GetInt(ini::Config::System, "HQMarket", "port");
 	login.m_bOrdered = true;
 	if (!login.Valid())
 	{
 		return Fail(5, "HQMarket endpoint and login credentials are required");
 	}
 
-	db::CConnectParam param(config.GetValue(ini::Config::System, "MySQL", "host", std::string("127.0.0.1")), config.GetValue(ini::Config::System, "MySQL", "port", 3306), config.GetValue(ini::Config::System, "MySQL", "account", std::string()), config.GetValue(ini::Config::System, "MySQL", "password", std::string()), strDatabase, "utf8mb4");
+	db::CConnectParam param(config.GetString(ini::Config::System, "MySQL", "host"), config.GetInt(ini::Config::System, "MySQL", "port"), config.GetString(ini::Config::System, "MySQL", "user"), config.GetString(ini::Config::System, "MySQL", "password"), strDatabase, "utf8mb4");
 	m_bDatabaseInitialized = true;
-	if (0 != CDBEngine::InstanceRef().Initialize(db::em_database::mysql, param, config.GetValue(ini::Config::System, "MySQL", "pool_size", 4)))
+	if (0 != CDBEngine::InstanceRef().Initialize(db::em_database::mysql, param, config.GetInt(ini::Config::System, "MySQL", "pool_size")))
 	{
 		return Fail(3, "XBroker MySQL initialization failed");
 	}

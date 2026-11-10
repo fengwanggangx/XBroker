@@ -2,6 +2,8 @@
 #include "../network/common_net.h"
 #include "../request/request.h"
 #include "../counter/TradeTypes.h"
+#include <chrono>
+#include <unordered_map>
 #include <functional>
 #include <mutex>
 #include <string>
@@ -29,6 +31,11 @@ public:
 	void SetMarketHandler(_TyRequestNotify&& handler);
 
 private:
+	bool HandleAuth(net::_TyConnectionId id, const CRequest& req);
+	bool HandleReAuth(net::_TyConnectionId id, const CRequest& req);
+	bool Login(net::_TyConnectionId id, const CRequest& req, std::string& strToken);
+	void SendAuthResponse(net::_TyConnectionId id, const CRequest& req, int nErrorCode, const std::string& strMessage) const;
+
 	void OnCounterEvent(const trade::CCountEvent& ev);
 	void OnCounterReply(const trade::CCounterReply& reply);
 
@@ -38,7 +45,7 @@ private:
 
 	CTradeService* m_pTradeService{ nullptr };
 	_TyRequestNotify m_handler_market;
-	std::string m_strToken;
+	std::unordered_map<std::string, std::chrono::steady_clock::time_point> m_clientTokens;
 	std::string m_strLastError;
 	std::mutex m_mtx_clients;
 	std::unordered_set<net::_TyConnectionId> m_clients;

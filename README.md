@@ -21,7 +21,7 @@ XBroker 是 C++20 柜台接入服务。账户身份由 `broker_id`、`site`、`a
 
 这是不兼容旧版本的协议更新。XBroker、XEngine、XTrader 必须配套升级，HQMarket 同步协议副本。使用新库 `broker_accounts_v2`，不读取旧账户配置表，不迁移或删除旧库。模拟适配器自行初始化并恢复账本、事务和写者租约。
 
-服务认证使用 `[Broker] token`，默认 TCP 9803。MySQL、HQMarket 和行情规则配置见 `XBroker/exec/debug/ini/system.ini`。从配置目录所在的运行目录启动。只有模拟账本持久化；通用账户对象是运行期会话。
+服务认证沿用 HQMarket 的账号密码登录和动态 token 流程，默认 TCP 9082。MySQL、HQMarket 和行情规则配置见 `XBroker/exec/debug/ini/system.ini`。从配置目录所在的运行目录启动。只有模拟账本持久化；通用账户对象是运行期会话。
 
 ## 验证
 
@@ -69,3 +69,12 @@ Dispatcher 由 `CTradeService` 以 `unique_ptr` 独占，交易服务负责初�
 
 打开 `XBroker.sln`，选择 `XBroker/XBroker.vcxproj`，使用 VS Linux 远程构建，配置为 Debug 或 Release、平台 x64；需在 VS 中配置 Linux 连接及工程所需依赖。
 本次仅核对解决方案及工程文件，不执行编译、链接或运行测试。
+
+
+### 服务登录与重连
+
+XEngine 使用 `[Broker] user/password` 登录 XBroker；这是服务账号，与 MySQL 连接账号、券商交易账号分别配置。XBroker 在自己的 MySQL `table_user` 中验证启用状态和加盐 SHA-256 密码，成功后调用现有 `utility::MakeSaltHex()` 签发 32 位十六进制 token。token 仅在内存中保存，有效期 24 小时；断线后可重用，不自动续期，XBroker 重启后失效。XEngine 的现有 Session 缓存 token，失效时回退账号密码登录；不预配置 token。
+
+Debug/Release 的 `sql/table_create.sql` 自动创建与 HQMarket/XEngine 相同的用户表，但不创建默认账号。部署前由管理员在 Broker 数据库配置服务用户；密码盐为 16 字节，`password_hash = SHA256(password_salt 字节 + UTF-8 密码字节)`，账号长度 3～64，密码长度 8～128。此处不新增公开注册接口。旧 `[Broker] token` 配置已移除。
+
+本次仅完成静态检查，未执行编译、数据库登录或断线恢复测试。

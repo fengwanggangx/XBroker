@@ -1,10 +1,47 @@
 #include "CBrokerCenter.h"
 #include "../service/CTradeService.h"
 #include "../request/RequestCenter.h"
-#include "../ini/CINIHandler.h"
+#include "../common/utility.h"
+#include "../database/CDBEngine.h"
+#include "../database/IDataBase.h"
+#include <cctype>
 #include "../network/CNetTools.h"
 #include "../common/container.h"
 #include <vector>
+
+namespace
+{
+	constexpr int InvalidRequest = 1001;
+	constexpr int InvalidCredentials = 1002;
+	constexpr int StorageUnavailable = 1004;
+	constexpr std::size_t MinUserLength = 3;
+	constexpr std::size_t MaxUserLength = 64;
+	constexpr std::size_t MinPasswordLength = 8;
+	constexpr std::size_t MaxPasswordLength = 128;
+	constexpr std::chrono::hours TokenLifetime{ 24 };
+
+	bool IsUserValid(const std::string& strUser)
+	{
+		if ((MinUserLength > strUser.size()) || (MaxUserLength < strUser.size()))
+		{
+			return false;
+		}
+		for (unsigned char character : strUser)
+		{
+			if ((0 == std::isalnum(character)) && ('_' != character) && ('-' != character) && ('.' != character) && ('@' != character))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	bool IsPasswordValid(const std::string& strPassword)
+	{
+		return (MinPasswordLength <= strPassword.size()) && (MaxPasswordLength >= strPassword.size());
+	}
+
+} // namespace
 
 CBrokerCenter::CBrokerCenter(CTradeService* pTradeService) : m_pTradeService(pTradeService)
 {
@@ -29,6 +66,7 @@ void CBrokerCenter::Stop()
 	m_handler_market = {};
 	std::lock_guard<std::mutex> lock(m_mtx_clients);
 	m_clients.clear();
+	m_clientTokens.clear();
 	m_bInitialized = false;
 }
 
@@ -41,12 +79,6 @@ bool CBrokerCenter::Initialize()
 	if (nullptr == m_pTradeService)
 	{
 		m_strLastError = "XBroker trade service is unavailable";
-		return false;
-	}
-	m_strToken = ini::CINIHandler::InstanceRef().GetValue(ini::Config::System, "Broker", "token", std::string());
-	if (m_strToken.empty())
-	{
-		m_strLastError = "XBroker service token is required";
 		return false;
 	}
 	m_pTradeService->SetCounterReplyHandler(std::bind_front(&CBrokerCenter::OnCounterReply, this));
@@ -104,6 +136,113 @@ bool CBrokerCenter::Broadcast(const CRequest& req)
 	return bSent;
 }
 
+bool CBrokerCenter::HandleAuth(net::_TyConnectionId id, const CRequest& req)
+{
+	{
+		std::lock_guard<std::mutex> lock(m_mtx_clients);
+		m_clients.erase(id);
+	}
+
+	std::string strToken = req.GetExtraData("token");
+	if (!strToken.empty())
+	{
+		return HandleReAuth(id, req);
+	}
+
+	if (_TyRequest::AUTH_LOGIN == req.GetType())
+	{
+		Login(id, req, strToken);
+		return true;
+	}
+	net::SendError(id, req, InvalidRequest, "unsupported authentication request");
+	return false;
+}
+
+bool CBrokerCenter::HandleReAuth(net::_TyConnectionId id, const CRequest& req)
+{
+	std::string strToken = req.GetExtraData("token");
+	bool bAccepted = false;
+	{
+		std::lock_guard<std::mutex> lck(m_mtx_clients);
+		const auto mIter = m_clientTokens.find(strToken);
+		bAccepted = (m_clientTokens.end() != mIter) && (std::chrono::steady_clock::now() < mIter->second);
+		if ((m_clientTokens.end() != mIter) && !bAccepted)
+		{
+			m_clientTokens.erase(mIter);
+		}
+		if (bAccepted)
+		{
+			m_clients.emplace(id);
+		}
+	}
+	if (bAccepted)
+	{
+		SendAuthResponse(id, req, 0, "认证成功");
+		return true;
+	}
+	SendAuthResponse(id, req, InvalidCredentials, "登录状态已失效");
+	return false;
+}
+
+bool CBrokerCenter::Login(net::_TyConnectionId id, const CRequest& req, std::string& strToken)
+{
+	std::string strUser = req.GetExtraData("user");
+	std::string strPassword = req.GetExtraData("password");
+	if (!IsUserValid(strUser) || !IsPasswordValid(strPassword))
+	{
+		SendAuthResponse(id, req, InvalidCredentials, "账号或密码错误");
+		return false;
+	}
+
+	db::_TyDBPtr db = CDBEngine::InstanceRef().GetDBPtr(db::em_database::mysql);
+	if (nullptr == db)
+	{
+		SendAuthResponse(id, req, StorageUnavailable, "用户数据库暂不可用");
+		return false;
+	}
+
+	std::string strSql = "SELECT user_id, user FROM table_user WHERE user=" + utility::Utf8Literal(strUser) + " AND password_hash=UNHEX(SHA2(CONCAT(password_salt,UNHEX('" + utility::ToHex(strPassword) + "')),256)) AND status=1 LIMIT 1";
+	const db::CTable& table = db->ExecQuery(strSql);
+	if (table.m_rows.empty())
+	{
+		SendAuthResponse(id, req, InvalidCredentials, "账号或密码错误");
+		return false;
+	}
+
+	CRequest response;
+	response.SetId(req.GetId());
+	response.SetType(req.GetType());
+	response.SetErrorInfo(0, "");
+	response.SetExtraData("user_id", db::to_string(table.m_rows.front().at(0)));
+	response.SetExtraData("user", db::to_string(table.m_rows.front().at(1)));
+	strToken = utility::MakeSaltHex();
+	response.SetExtraData("token", strToken);
+	{
+		std::lock_guard<std::mutex> lock(m_mtx_clients);
+		m_clients.emplace(id);
+		m_clientTokens.insert_or_assign(strToken, std::chrono::steady_clock::now() + TokenLifetime);
+	}
+	net::SendRequest(id, response);
+	return true;
+}
+
+void CBrokerCenter::SendAuthResponse(net::_TyConnectionId id, const CRequest& req, int nErrorCode, const std::string& strMessage) const
+{
+	CRequest response;
+	response.SetId(req.GetId());
+	response.SetType(req.GetType());
+	if (0 != nErrorCode)
+	{
+		net::SetError(response, nErrorCode, strMessage);
+	}
+	else
+	{
+
+		response.SetErrorInfo(0, "");
+	}
+	net::SendRequest(id, response);
+}
+
 int CBrokerCenter::OnClientNetEvent(const net::CNetEvent& ev)
 {
 	net::_TyConnectionId nConnection = ev.m_connection_id;
@@ -120,32 +259,10 @@ int CBrokerCenter::OnClientNetEvent(const net::CNetEvent& ev)
 	const CRequest& request = *ev.m_request;
 	if (_TyRequest::AUTH_LOGIN == request.GetType())
 	{
-		bool bAuthorized = m_strToken == request.GetExtraData("token");
-		{
-			std::lock_guard<std::mutex> lock(m_mtx_clients);
-			if (bAuthorized)
-			{
-				m_clients.emplace(nConnection);
-			}
-			else
-			{
-				m_clients.erase(nConnection);
-			}
-		}
-		CRequest response;
-		response.SetType(request.GetType());
-		response.SetId(request.GetId());
-		if (!bAuthorized)
-		{
-			response.SetErrorInfo(1, "Invalid XBroker service token");
-		}
-		else
-		{
-			response.SetExtraData("token", m_strToken);
-		}
-		net::SendRequest(nConnection, response);
+		HandleAuth(nConnection, request);
 		return 1;
 	}
+
 	bool bAuthorized = false;
 	{
 		std::lock_guard<std::mutex> lock(m_mtx_clients);

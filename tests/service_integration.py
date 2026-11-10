@@ -107,6 +107,8 @@ def main():
     def sql(query):
         return subprocess.check_output(['mysql','--socket='+args.socket,'-uroot','-N','-B','-e',query], text=True)
     sql('CREATE DATABASE '+database)
+    sql('USE '+database+'; '+(source/'exec/debug/sql/table_create.sql').read_text())
+    sql("INSERT INTO "+database+".table_user(user,password_hash,password_salt) VALUES('broker-service',UNHEX(SHA2(CONCAT(UNHEX(REPEAT('01',16)),'broker-password'),256)),UNHEX(REPEAT('01',16)))")
     subprocess.run(['mysql','--socket='+args.socket,'-uroot',database], input=pathlib.Path(args.ledger_fixture).read_text(), text=True, check=True)
     sql('CREATE DATABASE '+engine_database)
     sql("CREATE USER '"+engine_user+"'@'127.0.0.1' IDENTIFIED BY 'identity-test-password'")
@@ -128,7 +130,7 @@ def main():
             rules['rules'][0]['day']=day
             (runtime/'rules.json').write_text(json.dumps(rules))
             port=free_port()
-            (runtime/'ini/system.ini').write_text(f'[Broker]\nport={port}\ntoken=broker-test\n[MySQL]\nhost=127.0.0.1\nport={args.mysql_port}\naccount=root\npassword=\ndatabase={database}\npool_size=4\n[HQMarket]\nhost=127.0.0.1\nport={market.port}\naccount=hq-test\npassword=hq-test\n[Trade]\nbrokers_path={runtime}/ini/brokers.json\nrules_path={runtime}/rules.json\n')
+            (runtime/'ini/system.ini').write_text(f'[System]\ntcp_port={port}\n[MySQL]\nhost=127.0.0.1\nport={args.mysql_port}\nuser=root\npassword=\ndatabase={database}\npool_size=4\n[HQMarket]\nhost=127.0.0.1\nport={market.port}\nuser=hq-test\npassword=hq-test\n[Trade]\nbrokers_path={runtime}/ini/brokers.json\nrules_path={runtime}/rules.json\n')
             env=dict(os.environ,LD_LIBRARY_PATH=str(source/'libs/debug')+':'+os.environ.get('LD_LIBRARY_PATH',''))
             log=open(runtime/'broker.log','w')
             def start():
@@ -137,10 +139,16 @@ def main():
                 for _ in range(100):
                     if process.poll() is not None: raise AssertionError((runtime/'broker.log').read_text())
                     try:
-                        client=Client(port); clients.append(client); client.ok(1,token='broker-test'); return process,client
+                        client=Client(port); clients.append(client); client.ok(1,user='broker-service',password='broker-password'); return process,client
                     except OSError: time.sleep(.1)
                 raise AssertionError('startup timeout')
             process,client=start()
+            issued=client.ok(1,user='broker-service',password='broker-password')
+            token=next(one(parse(item),2).decode() for item in issued.get(3,[]) if one(parse(item),1)==b'token')
+            assert len(token)==32
+            resumed=Client(port); clients.append(resumed)
+            resumed.ok(1,token=token)
+            assert one(resumed.call(1,token='invalid-token'),6)!=0
             assert not parse(one(client.ok(9),31)).get(1,[]), 'startup published accounts'
             assert len(parse(one(client.ok(61),42)).get(1,[])) == 2, 'broker directory'
             identity=dict(broker_id=1,site='default',account='000123')
@@ -176,7 +184,7 @@ def main():
                 engine_source=root/'XEngine/XEngine'
                 (engine/'sql/table_create.sql').write_text((engine_source/'exec/debug/sql/table_create.sql').read_text())
                 engine_port=free_port()
-                (engine/'ini/system.ini').write_text(f'[Server]\nhost0=synthetic_127.0.0.1_{market.port}_1\n[System]\ntcp_port={engine_port}\nhttp_port={free_port()}\n[Broker]\nhost=127.0.0.1\nport={port}\ntoken=broker-test\n[MySQL]\nhost=127.0.0.1\nport={args.mysql_port}\naccount={engine_user}\npassword=identity-test-password\ndatabase={engine_database}\npool_size=4\n[HQMarket]\nhost=127.0.0.1\nport={market.port}\naccount=hq-test\npassword=hq-test\n')
+                (engine/'ini/system.ini').write_text(f'[Server]\nhost0=synthetic_127.0.0.1_{market.port}_1\n[System]\ntcp_port={engine_port}\nhttp_port={free_port()}\n[Broker]\nhost=127.0.0.1\nport={port}\nuser=broker-service\npassword=broker-password\n[MySQL]\nhost=127.0.0.1\nport={args.mysql_port}\nuser={engine_user}\npassword=identity-test-password\ndatabase={engine_database}\npool_size=4\n[HQMarket]\nhost=127.0.0.1\nport={market.port}\nuser=hq-test\npassword=hq-test\n')
                 engine_env=dict(env,LD_LIBRARY_PATH=str(engine_source/'libs/debug')+':'+env['LD_LIBRARY_PATH'])
                 engine_log=open(engine/'engine.log','w')
                 engine_process=subprocess.Popen([args.xengine_binary],cwd=engine,env=engine_env,stdout=engine_log,stderr=engine_log); processes.append(engine_process)
