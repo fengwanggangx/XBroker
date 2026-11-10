@@ -51,9 +51,17 @@ bool CBootLoader::Initialize()
 		return Fail(5, "HQMarket endpoint and login credentials are required");
 	}
 
-	db::CConnectParam param(config.GetString(ini::Config::System, "MySQL", "host"), config.GetInt(ini::Config::System, "MySQL", "port"), config.GetString(ini::Config::System, "MySQL", "user"), config.GetString(ini::Config::System, "MySQL", "password"), strDatabase, "utf8mb4");
+	int nMySqlPort = config.GetInt(ini::Config::System, "MySQL", "port");
+	int nMySqlPoolSize = config.GetInt(ini::Config::System, "MySQL", "pool_size");
+	std::string strMySqlHost = config.GetString(ini::Config::System, "MySQL", "host");
+	std::string strMySqlUser = config.GetString(ini::Config::System, "MySQL", "user");
+	if (strMySqlHost.empty() || strMySqlUser.empty() || (0 >= nMySqlPort) || (65535 < nMySqlPort) || (0 >= nMySqlPoolSize))
+	{
+		return Fail(3, "Invalid MySQL host, user, port or pool_size in ini/system.ini");
+	}
+	db::CConnectParam param(strMySqlHost, static_cast<unsigned int>(nMySqlPort), strMySqlUser, config.GetString(ini::Config::System, "MySQL", "password"), strDatabase, "utf8mb4");
 	m_bDatabaseInitialized = true;
-	if (0 != CDBEngine::InstanceRef().Initialize(db::em_database::mysql, param, config.GetInt(ini::Config::System, "MySQL", "pool_size")))
+	if (0 != CDBEngine::InstanceRef().Initialize(db::em_database::mysql, param, nMySqlPoolSize))
 	{
 		return Fail(3, "XBroker MySQL initialization failed");
 	}
