@@ -31,35 +31,38 @@ bool CBootLoader::Initialize()
 	}
 
 	ini::CINIHandler& config = ini::CINIHandler::InstanceRef();
-	std::string strDatabase = config.GetString(ini::Config::System, "MySQL", "database");
 	int nPort = config.GetInt(ini::Config::System, "System", "tcp_port");
-	if (strDatabase.empty() || 0 >= nPort || 65535 < nPort)
+	if (0 >= nPort || 65535 < nPort)
 	{
 		return Fail(2, "XBroker database and valid port are required");
 	}
 
+	static const std::string cs_hqmarket = "HQMarket";
 	CLoginInfo login;
-	login.m_strUser = config.GetString(ini::Config::System, "HQMarket", "user");
-	login.m_strPassword = config.GetString(ini::Config::System, "HQMarket", "password");
-	login.m_strToken = config.GetString(ini::Config::System, "HQMarket", "token");
-	login.m_host.m_strName = "HQMarket";
-	login.m_host.m_strHost = config.GetString(ini::Config::System, "HQMarket", "host");
-	login.m_host.m_nPort = config.GetInt(ini::Config::System, "HQMarket", "port");
+	login.m_strUser = config.GetString(ini::Config::System, cs_hqmarket, "user");
+	login.m_strPassword = config.GetString(ini::Config::System, cs_hqmarket, "password");
+	login.m_strToken = config.GetString(ini::Config::System, cs_hqmarket, "token");
+
+	login.m_host.m_strName = cs_hqmarket;
+	login.m_host.m_strHost = config.GetString(ini::Config::System, cs_hqmarket, "host");
+	login.m_host.m_nPort = config.GetInt(ini::Config::System, cs_hqmarket, "port");
 	login.m_bOrdered = true;
 	if (!login.Valid())
 	{
 		return Fail(5, "HQMarket endpoint and login credentials are required");
 	}
 
-	int nMySqlPort = config.GetInt(ini::Config::System, "MySQL", "port");
-	int nMySqlPoolSize = config.GetInt(ini::Config::System, "MySQL", "pool_size");
-	std::string strMySqlHost = config.GetString(ini::Config::System, "MySQL", "host");
-	std::string strMySqlUser = config.GetString(ini::Config::System, "MySQL", "user");
+	static const std::string cs_mysql = "MySQL";
+	int nMySqlPort = config.GetInt(ini::Config::System, cs_mysql, "port");
+	int nMySqlPoolSize = config.GetInt(ini::Config::System, cs_mysql, "pool_size");
+	std::string strMySqlHost = config.GetString(ini::Config::System, cs_mysql, "host");
+	std::string strMySqlUser = config.GetString(ini::Config::System, cs_mysql, "user");
+	std::string strDatabase = config.GetString(ini::Config::System, cs_mysql, "database");
 	if (strMySqlHost.empty() || strMySqlUser.empty() || (0 >= nMySqlPort) || (65535 < nMySqlPort) || (0 >= nMySqlPoolSize))
 	{
 		return Fail(3, "Invalid MySQL host, user, port or pool_size in ini/system.ini");
 	}
-	db::CConnectParam param(strMySqlHost, static_cast<unsigned int>(nMySqlPort), strMySqlUser, config.GetString(ini::Config::System, "MySQL", "password"), strDatabase, "utf8mb4");
+	db::CConnectParam param(strMySqlHost, static_cast<unsigned int>(nMySqlPort), strMySqlUser, config.GetString(ini::Config::System, cs_mysql, "password"), strDatabase, "utf8mb4");
 	m_bDatabaseInitialized = true;
 	if (0 != CDBEngine::InstanceRef().Initialize(db::em_database::mysql, param, nMySqlPoolSize))
 	{
