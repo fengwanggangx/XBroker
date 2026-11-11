@@ -7,7 +7,7 @@ XBroker 是 C++20 柜台接入服务。账户身份由 `broker_id`、`site`、`a
 `ini/system.ini` 的 `[Trade] brokers_path` 指向券商目录 JSON，默认 `ini/brokers.json`：
 
 ```json
-[{"id":1,"name":"模拟券商","adapter":"simulated","sites":["default"]}]
+[{"id":1,"name":"模拟炒股","adapter":"simulated","sites":["default"]}]
 ```
 
 券商 ID 必须非零且唯一；名称用于展示，适配器键选择已注册的柜台实现，站点必须非空且不重复。未知适配器导致启动失败。真实券商通过 `CCounterFactory` 注册，当前不包含真实券商 SDK。

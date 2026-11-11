@@ -1,7 +1,7 @@
 [
   {
     "id": 1,
-    "name": "模拟券商",
+    "name": "模拟炒股",
     "adapter": "simulated",
     "sites": [
       "default"
