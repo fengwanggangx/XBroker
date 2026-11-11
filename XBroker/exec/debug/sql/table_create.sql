@@ -11,4 +11,17 @@ CREATE TABLE IF NOT EXISTS table_user
 	UNIQUE KEY uk_table_user_user (user)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
--- Accounts are runtime sessions. The simulated adapter initializes its own ledger tables.
+CREATE TABLE IF NOT EXISTS table_account
+(
+	broker_id BIGINT UNSIGNED NOT NULL,
+	account VARCHAR(64) NOT NULL,
+	password_hash BINARY(32) NOT NULL,
+	password_salt BINARY(16) NOT NULL,
+	initial_balance_cents BIGINT NOT NULL,
+	status TINYINT UNSIGNED NOT NULL DEFAULT 1,
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	PRIMARY KEY (broker_id, account)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+-- The simulated adapter initializes its own ledger tables.

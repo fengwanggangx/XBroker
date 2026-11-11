@@ -5,6 +5,8 @@
 #include "../ini/CINIHandler.h"
 #include "../counter/CSimulatedDispatcher.h"
 #include "../counter/zhongtai/CZhongTaiDispatcher.h"
+#include "../database/CDBEngine.h"
+#include "../database/IDataBase.h"
 #include "../request/request.pb.h"
 #include <rapidjson/document.h>
 #include <fstream>
@@ -238,6 +240,29 @@ bool CTradeService::HandleAccountLogin(const CRequest& req)
 	{
 		SendError(req.GetConnectionId(), req, 3, "Unknown broker or site");
 		return false;
+	}
+	if ("simulated" == broker->second.m_strAdapter)
+	{
+		db::_TyDBPtr pDB = CDBEngine::InstanceRef().GetDBPtr(db::em_database::mysql);
+		if (nullptr == pDB)
+		{
+			SendError(req.GetConnectionId(), req, 2, "模拟账户数据库不可用");
+			return false;
+		}
+		std::string strSql = "SELECT account FROM table_account WHERE broker_id=" + std::to_string(account.first) +
+			" AND account=" + utility::Utf8Literal(account.second) +
+			" AND password_hash=UNHEX(SHA2(CONCAT(password_salt,UNHEX('" + utility::ToHex(req.GetExtraData("password")) + "')),256)) AND status=1 LIMIT 1";
+		const db::CTable& table = pDB->ExecQuery(strSql);
+		if (table.m_columns.empty())
+		{
+			SendError(req.GetConnectionId(), req, 2, "模拟账户数据库不可用");
+			return false;
+		}
+		if (table.m_rows.empty())
+		{
+			SendError(req.GetConnectionId(), req, 1002, "模拟交易账户或密码错误");
+			return false;
+		}
 	}
 	bool bLoginBlocked = false;
 	bool bConnected = false;

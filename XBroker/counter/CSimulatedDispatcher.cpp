@@ -65,8 +65,22 @@ trade::CResult CSimulatedDispatcher::Start(std::unique_ptr<trade::ICounterStore>
 		m_counter.reset();
 		return result;
 	}
+	std::vector<trade::CFunds> existingAccounts = m_counter->Accounts();
 	for (const auto& account : accounts)
 	{
+		bool bExists = false;
+		for (const trade::CFunds& existing : existingAccounts)
+		{
+			if (existing.m_accountIndex == account.m_accountIndex)
+			{
+				bExists = true;
+				break;
+			}
+		}
+		if (bExists)
+		{
+			continue;
+		}
 		result = m_counter->AddAccount(account.m_accountIndex, account.m_nBalance);
 		if (!result.Ok())
 		{

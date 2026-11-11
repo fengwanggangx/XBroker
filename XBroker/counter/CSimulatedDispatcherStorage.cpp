@@ -2,6 +2,8 @@
 #include "CStorager.h"
 #include "../common/utility.h"
 #include "../ini/CINIHandler.h"
+#include "../database/CDBEngine.h"
+#include "../database/IDataBase.h"
 #include <rapidjson/document.h>
 #include <fstream>
 #include <iterator>
@@ -92,7 +94,31 @@ trade::CResult CSimulatedDispatcher::Initialize()
 		{
 			return result;
 		}
-		return Start({}, rules, calendar);
+		db::_TyDBPtr pDB = CDBEngine::InstanceRef().GetDBPtr(db::em_database::mysql);
+		if (nullptr == pDB)
+		{
+			return { trade::Error::Unavailable, "simulated account database unavailable" };
+		}
+		const db::CTable& table = pDB->ExecQuery("SELECT broker_id, account, initial_balance_cents FROM table_account WHERE status=1");
+		if (table.m_columns.empty())
+		{
+			return { trade::Error::Unavailable, "cannot load simulated accounts" };
+		}
+		std::vector<trade::CFunds> accounts;
+		accounts.reserve(table.m_rows.size());
+		for (const db::_TyRow& row : table.m_rows)
+		{
+			trade::CFunds funds;
+			if ((3 != row.size()) ||
+				!utility::to_number(db::to_string(row[0]), funds.m_accountIndex.first) ||
+				!utility::to_number(db::to_string(row[2]), funds.m_nBalance))
+			{
+				return { trade::Error::Rejected, "invalid simulated account" };
+			}
+			funds.m_accountIndex.second = db::to_string(row[1]);
+			accounts.emplace_back(std::move(funds));
+		}
+		return Start(accounts, rules, calendar);
 	}
 	catch (const std::exception& error)
 	{
