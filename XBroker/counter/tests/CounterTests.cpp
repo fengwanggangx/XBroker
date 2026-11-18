@@ -316,6 +316,9 @@ namespace
 			  "duplicate dispatcher start rejected");
 		gateway.OnMarketState(true);
 		std::shared_ptr<ITradeSession> session = dispatcher->Create({ TestAccount(1), "simulated" });
+		std::optional<CExecutionRule> executionRules = session->GetExecutionRules("600000.SSE");
+		Check(executionRules.has_value() && executionRules->m_reliableQuery && executionRules->m_idempotentClientId && ("fixture-1" == executionRules->m_rule.m_strVersion), "session exposes reliable instrument and fee rules");
+		Check(!session->GetExecutionRules("unknown").has_value(), "unknown instrument has no guessed rules");
 		Contract(*session, []()
 		{
 		});

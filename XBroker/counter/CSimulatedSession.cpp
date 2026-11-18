@@ -75,3 +75,9 @@ void CSimulatedSession::Publish(const trade::CCountEvent& event)
 		handler(sourceEvent);
 	}
 }
+
+std::optional<trade::CExecutionRule> CSimulatedSession::GetExecutionRules(const std::string& security) const
+{
+	std::lock_guard<std::mutex> lock(m_mtx_state);
+	return m_closed ? std::nullopt : m_pDispatcher->GetExecutionRules(security);
+}

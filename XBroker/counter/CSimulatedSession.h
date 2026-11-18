@@ -12,6 +12,7 @@ public:
 	~CSimulatedSession() override;
 	void Close() override;
 	trade::CAccountData Snapshot() const override;
+	std::optional<trade::CExecutionRule> GetExecutionRules(const std::string& security) const override;
 	void SetEventHandler(_TyEventHandler handler) override;
 	void SetReplyHandler(_TyReplyHandler handler) override;
 	trade::CResult SendRequest(trade::CReqParam request) override;

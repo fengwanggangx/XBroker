@@ -2,6 +2,7 @@
 #include "TradeTypes.h"
 #include <functional>
 #include <atomic>
+#include <optional>
 
 namespace trade
 {
@@ -26,6 +27,11 @@ namespace trade
 		virtual CResult SendRequest(CReqParam request) = 0;
 		virtual void SetReplyHandler(_TyReplyHandler handler) = 0;
 		virtual CAccountData Snapshot() const = 0;
+		virtual std::optional<CExecutionRule> GetExecutionRules(const std::string& security) const
+		{
+			static_cast<void>(security);
+			return std::nullopt;
+		}
 		virtual void SetEventHandler(_TyEventHandler handler) = 0;
 		// Resource cleanup only. Confirm business disconnect through SendRequest first.
 		virtual void Close() = 0;

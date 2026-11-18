@@ -226,6 +226,13 @@ namespace trade
 		int m_nDay{ 0 };
 		std::int64_t m_nOpen{ 0 }, m_nBreak{ 0 }, m_nResume{ 0 }, m_nClose{ 0 };
 	};
+	struct CExecutionRule
+	{
+		CRule m_rule;
+		CCalendar m_calendar;
+		bool m_reliableQuery{ false };
+		bool m_idempotentClientId{ false };
+	};
 	struct CLevel
 	{
 		std::int64_t m_nPrice{ 0 }, m_nQuantity{ 0 };

@@ -70,6 +70,7 @@ private:
 
 	bool HandleDealQuery(const CRequest& req);
 	bool HandleFundsQuery(const CRequest& req);
+	bool HandleExecutionRules(const CRequest& req);
 	bool HandleOrderQuery(const CRequest& req);
 	bool HandleOrderSubmit(const CRequest& req);
 	bool HandleOrderCancel(const CRequest& req);

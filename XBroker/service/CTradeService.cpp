@@ -1,4 +1,5 @@
 #include "CTradeService.h"
+#include "../counter/ExecutionRulesWire.h"
 #include "../counter/TradeProtocol.h"
 #include "../common/utility.h"
 #include "../common/container.h"
@@ -41,6 +42,7 @@ namespace
 CTradeService::CTradeService()
 {
 	m_handler_request = {
+		{ _TyRequest::TRADE_EXECUTION_RULES_QUERY, std::bind_front(&CTradeService::HandleExecutionRules, this) },
 		{ _TyRequest::SUPPORTED_BROKER_QUERY, std::bind_front(&CTradeService::HandleQueryBrokerSupported, this) },
 		{ _TyRequest::TRADE_ACCOUNT_LOGIN, std::bind_front(&CTradeService::HandleAccountLogin, this) },
 		{ _TyRequest::TRADE_ACCOUNT_LIST_QUERY, std::bind_front(&CTradeService::HandleAccountListQuery, this) },
@@ -813,4 +815,25 @@ void CTradeService::SetCounterReplyHandler(_TyCounterReplyHandler&& handler)
 void CTradeService::SetCounterEventHandler(_TyCounterEventHandler&& handler)
 {
 	m_counter_event = std::move(handler);
+}
+
+bool CTradeService::HandleExecutionRules(const CRequest& req)
+{
+	_TyAccount account;
+	std::shared_ptr<trade::ITradeSession> counter = FindCounter(req, account);
+	if (nullptr == counter)
+	{
+		return false;
+	}
+	std::optional<trade::CExecutionRule> rules = counter->GetExecutionRules(req.GetExtraData("security"));
+	if (!rules.has_value())
+	{
+		SendError(req.GetConnectionId(), req, static_cast<int>(trade::Error::Unsupported), "Execution rules and fee bounds unavailable");
+		return false;
+	}
+	CRequest response = Response(req);
+	request::ExecutionRules wire;
+	trade::WriteExecutionRules(*rules, wire);
+	response.SetData(wire);
+	return SendResponse(req.GetConnectionId(), response);
 }

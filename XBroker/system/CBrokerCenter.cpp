@@ -289,6 +289,7 @@ int CBrokerCenter::OnClientNetEvent(const net::CNetEvent& ev)
 	case _TyRequest::TRADE_ACCOUNT_LOGIN:
 	case _TyRequest::TRADE_ACCOUNT_LIST_QUERY:
 	case _TyRequest::TRADE_ACCOUNT_DISCONNECT:
+	case _TyRequest::TRADE_EXECUTION_RULES_QUERY:
 	case _TyRequest::TRADE_FUNDS_QUERY:
 	case _TyRequest::TRADE_ORDER_SUBMIT:
 	case _TyRequest::TRADE_ORDER_CANCEL:

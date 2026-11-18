@@ -30,6 +30,7 @@ public:
 
 	trade::CResult Send(trade::CReqParam request, _TyReplyHandler handler, std::uint64_t instance);
 	trade::CAccountData Snapshot(const _TyAccount& account) const;
+	std::optional<trade::CExecutionRule> GetExecutionRules(const std::string& security) const;
 
 	void OnDepth(trade::CDepth depth) override;
 	void OnMarketState(bool bAvailable) override;
@@ -63,6 +64,8 @@ private:
 	std::condition_variable m_condition;
 	std::deque<std::function<void()>> m_work;
 	std::map<_TyAccount, trade::CAccountData> m_snapshots;
+	std::vector<trade::CRule> m_rules;
+	std::vector<trade::CCalendar> m_calendar;
 	std::uint64_t m_version{ 0 };
 	bool m_bReady{ false };
 	std::uint64_t m_delivered{ 0 };

@@ -105,6 +105,8 @@ trade::CResult CSimulatedDispatcher::Start(std::unique_ptr<trade::ICounterStore>
 		}
 		m_snapshots.emplace(account.m_accountIndex, std::move(data));
 	}
+	m_rules = rules;
+	m_calendar = calendar;
 	m_delivered = m_counter->Version();
 	m_version = m_delivered;
 	m_bReady = m_counter->Ready();
@@ -483,4 +485,28 @@ void CSimulatedDispatcher::SyncDepthSubscriptions(bool stopping)
 			m_depthSubscriptions.emplace(item.first);
 		}
 	}
+}
+
+std::optional<trade::CExecutionRule> CSimulatedDispatcher::GetExecutionRules(const std::string& security) const
+{
+	std::lock_guard<std::mutex> lock(m_mtx_state);
+	if (m_bStopping || !m_bReady || !m_clock)
+	{
+		return std::nullopt;
+	}
+	std::int64_t now = m_clock();
+	for (const auto& calendar : m_calendar)
+	{
+		if ((calendar.m_nOpen <= now) && (now < calendar.m_nClose))
+		{
+			for (const auto& rule : m_rules)
+			{
+				if ((calendar.m_nDay == rule.m_nDay) && (security == rule.m_strSecurity))
+				{
+					return trade::CExecutionRule{ rule, calendar, true, true };
+				}
+			}
+		}
+	}
+	return std::nullopt;
 }

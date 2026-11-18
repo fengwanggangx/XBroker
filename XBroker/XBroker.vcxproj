@@ -254,4 +254,7 @@
     <Error Condition="'$(Platform)'!='x64'" Text="XTP requires Linux x64" />
     <Error Condition="'$(XBrokerXtpSdk)'==''" Text="Set XBrokerXtpSdk to the SDK root on the build host" />
   </Target>
+  <ItemGroup>
+    <ClInclude Include="counter\ExecutionRulesWire.h" />
+  </ItemGroup>
 </Project>
