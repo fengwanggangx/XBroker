@@ -200,7 +200,7 @@ def main():
                 pending=dict(order,client_order_id=202,signal_id=44,price=900)
                 pending_id=one(parse(one(parse(one(terminal.ok(49,**pending),41)),8)),1)
                 terminal.ok(50,**identity,order_id=pending_id)
-                strategy=field(2,'moving_average')+field(3,'identity-strategy')+field(5,field(1,'600000')+field(2,'SSE')+field(3,'quote'))+field(6,4096)+field(8,1)+field(9,1)+field(10,'default')+field(11,'000123')
+                strategy=field(2,'dual_ma_cross')+field(3,'identity-strategy')+field(5,field(1,'600000')+field(2,'SSE')+field(3,'quote'))+field(6,4096)+field(8,1)+field(9,1)+field(10,'default')+field(11,'000123')
                 terminal.next_id+=1; terminal.socket.sendall(packet(20,terminal.next_id,payload=field(22,strategy)))
                 while True:
                     result=recv(terminal.socket)
