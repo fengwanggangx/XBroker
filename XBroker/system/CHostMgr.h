@@ -9,12 +9,12 @@
 
 struct CHostInfo
 {
-	std::string m_strKey;
-	std::string m_strName;
-	std::string m_strHost;
-	unsigned int m_nPort{ 0 };
+	std::string m_key;
+	std::string m_name;
+	std::string m_host;
+	unsigned int m_port{ 0 };
 
-	bool m_bEnabled{ false };
+	bool m_enabled{ false };
 
 	bool operator==(const CHostInfo& arg) const;
 
@@ -41,8 +41,8 @@ class CHostMgr final
 	void Initialize();
 
 	private:
-	bool m_bConnectFast{ false };
-	std::map<std::string, CHostInfo> m_hosts;
+		bool m_connect_fast{ false };
+		std::map<std::string, CHostInfo> m_hosts;
 };
 
 #endif

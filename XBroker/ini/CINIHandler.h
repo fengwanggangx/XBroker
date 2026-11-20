@@ -39,8 +39,8 @@ namespace ini
 		template <class Type, std::enable_if_t<!std::is_convertible<Type, std::string>::value, int> = 0>
 		Type GetValue(Config config, const std::string& strSection, const std::string& strKey, Type&& defaultValue) const
 		{
-			const auto& mIter = m_iniFiles.find(config);
-			if (m_iniFiles.end() == mIter)
+			const auto& mIter = m_ini_files.find(config);
+			if (m_ini_files.end() == mIter)
 			{
 				return std::forward<Type>(defaultValue);
 			}
@@ -50,8 +50,8 @@ namespace ini
 		template <class Type, std::enable_if_t<std::is_convertible<Type, std::string>::value, int> = 0>
 		std::string GetValue(Config config, const std::string& strSection, const std::string& strKey, Type&& defaultValue) const
 		{
-			const auto& mIter = m_iniFiles.find(config);
-			if (m_iniFiles.end() == mIter)
+			const auto& mIter = m_ini_files.find(config);
+			if (m_ini_files.end() == mIter)
 			{
 				return std::forward<Type>(defaultValue);
 			}
@@ -61,8 +61,8 @@ namespace ini
 		template <class Type>
 		bool SetValue(Config config, const std::string& strSection, const std::string& strKey, Type&& value)
 		{
-			const auto& mIter = m_iniFiles.find(config);
-			if (m_iniFiles.end() == mIter)
+			const auto& mIter = m_ini_files.find(config);
+			if (m_ini_files.end() == mIter)
 			{
 				return false;
 			}
@@ -74,7 +74,7 @@ namespace ini
 		bool UpdateEntry(Config config, const std::string& strSection, const std::string& strKey, const std::optional<std::string>& value, const std::string& oldKey = {});
 
 	  private:
-		std::unordered_map<Config, std::unique_ptr<CIniFile>> m_iniFiles;
+		  std::unordered_map<Config, std::unique_ptr<CIniFile>> m_ini_files;
 	};
 } // namespace ini
 

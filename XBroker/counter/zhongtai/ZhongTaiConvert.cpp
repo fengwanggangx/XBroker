@@ -48,62 +48,62 @@ namespace trade::zhongtai
 	COrder ReadOrder(const request::TradeOrderRecord& w)
 	{
 		COrder r;
-		r.m_accountIndex = AccountIndex(w);
-		r.m_orderId = w.order_id();
-		r.m_clientId = w.client_order_id();
-		r.m_requestId = w.request_id();
-		r.m_strategyId = w.strategy_id();
-		r.m_signalId = w.signal_id();
-		r.m_strSecurity = w.security();
+		r.m_account_index = AccountIndex(w);
+		r.m_order_id = w.order_id();
+		r.m_client_id = w.client_order_id();
+		r.m_request_id = w.request_id();
+		r.m_strategy_id = w.strategy_id();
+		r.m_signal_id = w.signal_id();
+		r.m_security = w.security();
 		r.m_side = static_cast<Side>(w.side());
 		r.m_status = static_cast<Status>(w.state());
-		r.m_nPrice = w.price();
-		r.m_nPriceScale = w.price_scale();
-		r.m_nQuantity = w.quantity();
-		r.m_nFilled = w.filled_quantity();
-		r.m_nFrozen = w.frozen();
-		r.m_nTurnover = w.turnover();
-		r.m_nFee = w.fee();
-		r.m_nTime = w.time_ms();
-		r.m_strRuleVersion = w.rule_version();
-		r.m_nDay = w.trading_day();
-		r.m_strBrokerOrderId = w.broker_order_id();
-		r.m_strRawStatus = w.raw_status();
-		r.m_strError = w.broker_error();
-		r.m_bCancelPending = w.cancel_pending();
-		r.m_bFeeKnown = !w.extended_fields() || w.fee_known();
-		r.m_bFrozenKnown = !w.extended_fields() || w.frozen_known();
-		r.m_sdkClientId = w.sdk_client_id();
-		r.m_nBrokerTime = w.broker_time();
+		r.m_price = w.price();
+		r.m_price_scale = w.price_scale();
+		r.m_quantity = w.quantity();
+		r.m_filled = w.filled_quantity();
+		r.m_frozen = w.frozen();
+		r.m_turnover = w.turnover();
+		r.m_fee = w.fee();
+		r.m_time = w.time_ms();
+		r.m_rule_version = w.rule_version();
+		r.m_day = w.trading_day();
+		r.m_broker_order_id = w.broker_order_id();
+		r.m_raw_status = w.raw_status();
+		r.m_error_message = w.broker_error();
+		r.m_cancel_pending = w.cancel_pending();
+		r.m_fee_known = !w.extended_fields() || w.fee_known();
+		r.m_frozen_known = !w.extended_fields() || w.frozen_known();
+		r.m_sdk_client_id = w.sdk_client_id();
+		r.m_broker_time = w.broker_time();
 		return r;
 	}
 	CTrade ReadTrade(const request::TradeRecord& w)
 	{
 		CTrade r;
-		r.m_accountIndex = AccountIndex(w);
-		r.m_tradeId = w.trade_id();
-		r.m_orderId = w.order_id();
-		r.m_strSecurity = w.security();
+		r.m_account_index = AccountIndex(w);
+		r.m_trade_id = w.trade_id();
+		r.m_order_id = w.order_id();
+		r.m_security = w.security();
 		r.m_side = static_cast<Side>(w.side());
-		r.m_nPrice = w.price();
-		r.m_nPriceScale = w.price_scale();
-		r.m_nQuantity = w.quantity();
-		r.m_nFee = w.fee();
-		r.m_nTime = w.time_ms();
-		r.m_nDay = w.trading_day();
-		r.m_strBrokerTradeId = w.broker_trade_id();
-		r.m_strBrokerOrderId = w.broker_order_id();
-		r.m_reportIndex = w.report_index();
+		r.m_price = w.price();
+		r.m_price_scale = w.price_scale();
+		r.m_quantity = w.quantity();
+		r.m_fee = w.fee();
+		r.m_time = w.time_ms();
+		r.m_day = w.trading_day();
+		r.m_broker_trade_id = w.broker_trade_id();
+		r.m_broker_order_id = w.broker_order_id();
+		r.m_report_index = w.report_index();
 		r.m_market = w.market();
-		r.m_bFeeKnown = !w.extended_fields() || w.fee_known();
+		r.m_fee_known = !w.extended_fields() || w.fee_known();
 		return r;
 	}
 	bool SameOrder(const COrder& a, const COrder& b)
 	{
-		return a.m_strSecurity == b.m_strSecurity && a.m_side == b.m_side && a.m_nPrice == b.m_nPrice && a.m_nPriceScale == b.m_nPriceScale && a.m_nQuantity == b.m_nQuantity && a.m_strategyId == b.m_strategyId && a.m_signalId == b.m_signalId;
+		return a.m_security == b.m_security && a.m_side == b.m_side && a.m_price == b.m_price && a.m_price_scale == b.m_price_scale && a.m_quantity == b.m_quantity && a.m_strategy_id == b.m_strategy_id && a.m_signal_id == b.m_signal_id;
 	}
 	std::string TradeKey(const CTrade& t)
 	{
-		return std::to_string(t.m_nDay) + ":" + std::to_string(t.m_market) + ":" + std::to_string(t.m_reportIndex);
+		return std::to_string(t.m_day) + ":" + std::to_string(t.m_market) + ":" + std::to_string(t.m_report_index);
 	}
 } // namespace trade::zhongtai

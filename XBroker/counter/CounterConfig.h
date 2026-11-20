@@ -6,7 +6,7 @@ namespace trade
 {
 	struct CCounterConfig
 	{
-		_TyAccount m_accountIndex{ };
-		std::string m_strAdapter;
+		_TyAccount m_account_index{};
+		std::string m_adapter;
 	};
 } // namespace trade

@@ -9,12 +9,12 @@ namespace trade
 		public:
 		explicit CStateEdit(CState& state) : m_state(state)
 		{
-			m_original.m_nextOrder = state.m_nextOrder;
-			m_original.m_nextTrade = state.m_nextTrade;
+			m_original.m_next_order = state.m_next_order;
+			m_original.m_next_trade = state.m_next_trade;
 			m_original.m_sequence = state.m_sequence;
-			m_original.m_nSettledDay = state.m_nSettledDay;
-			m_original.m_nClosedDay = state.m_nClosedDay;
-			m_nEvents = state.m_events.size();
+			m_original.m_settled_day = state.m_settled_day;
+			m_original.m_closed_day = state.m_closed_day;
+			m_original_event_count = state.m_events.size();
 		}
 		CStateEdit(const CStateEdit&) = delete;
 		CStateEdit& operator=(const CStateEdit&) = delete;
@@ -32,7 +32,7 @@ namespace trade
 		}
 		void Accept()
 		{
-			m_bFinished = true;
+			m_finished = true;
 		}
 		template <class Key, class Value>
 		void Save(std::map<Key, Value> CState::* member, const Key& key)
@@ -52,24 +52,24 @@ namespace trade
 		CState Changes() const
 		{
 			CState changes;
-			changes.m_nextOrder = m_state.m_nextOrder;
-			changes.m_nextTrade = m_state.m_nextTrade;
+			changes.m_next_order = m_state.m_next_order;
+			changes.m_next_trade = m_state.m_next_trade;
 			changes.m_sequence = m_state.m_sequence;
-			changes.m_nSettledDay = m_state.m_nSettledDay;
-			changes.m_nClosedDay = m_state.m_nClosedDay;
+			changes.m_settled_day = m_state.m_settled_day;
+			changes.m_closed_day = m_state.m_closed_day;
 			Copy(&CState::m_accounts, changes);
 			Copy(&CState::m_positions, changes);
 			Copy(&CState::m_orders, changes);
 			Copy(&CState::m_trades, changes);
 			Copy(&CState::m_rules, changes);
 			Copy(&CState::m_calendar, changes);
-			Copy(&CState::m_consumedBooks, changes);
-			changes.m_events.assign(m_state.m_events.begin() + m_nEvents, m_state.m_events.end());
+			Copy(&CState::m_consumed_books, changes);
+			changes.m_events.assign(m_state.m_events.begin() + m_original_event_count, m_state.m_events.end());
 			return changes;
 		}
 		void Rollback()
 		{
-			if (m_bFinished)
+			if (m_finished)
 			{
 				return;
 			}
@@ -79,14 +79,14 @@ namespace trade
 			Restore(&CState::m_trades);
 			Restore(&CState::m_rules);
 			Restore(&CState::m_calendar);
-			Restore(&CState::m_consumedBooks);
-			m_state.m_nextOrder = m_original.m_nextOrder;
-			m_state.m_nextTrade = m_original.m_nextTrade;
+			Restore(&CState::m_consumed_books);
+			m_state.m_next_order = m_original.m_next_order;
+			m_state.m_next_trade = m_original.m_next_trade;
 			m_state.m_sequence = m_original.m_sequence;
-			m_state.m_nSettledDay = m_original.m_nSettledDay;
-			m_state.m_nClosedDay = m_original.m_nClosedDay;
-			m_state.m_events.resize(m_nEvents);
-			m_bFinished = true;
+			m_state.m_settled_day = m_original.m_settled_day;
+			m_state.m_closed_day = m_original.m_closed_day;
+			m_state.m_events.resize(m_original_event_count);
+			m_finished = true;
 		}
 
 		private:
@@ -116,7 +116,7 @@ namespace trade
 		}
 		CState& m_state;
 		CState m_original, m_touched;
-		std::size_t m_nEvents{ 0 };
-		bool m_bFinished{ false };
+		std::size_t m_original_event_count{ 0 };
+		bool m_finished{ false };
 	};
 } // namespace trade

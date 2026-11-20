@@ -43,7 +43,7 @@ namespace
 
 } // namespace
 
-CBrokerCenter::CBrokerCenter(CTradeService* pTradeService) : m_pTradeService(pTradeService)
+CBrokerCenter::CBrokerCenter(CTradeService* pTradeService) : m_trade_service(pTradeService)
 {
 }
 
@@ -55,38 +55,38 @@ CBrokerCenter::~CBrokerCenter()
 void CBrokerCenter::Stop()
 {
 	// BootLoader drains network and counter callbacks before detaching the center.
-	if (nullptr != m_pTradeService)
+	if (nullptr != m_trade_service)
 	{
-		m_pTradeService->SetCounterReplyHandler({});
-		m_pTradeService->SetCounterEventHandler({});
-		m_pTradeService->SetPushHandler({});
-		m_pTradeService->SetReplyHandler({});
-		m_pTradeService->SetDepthHandler({});
+		m_trade_service->SetCounterReplyHandler({});
+		m_trade_service->SetCounterEventHandler({});
+		m_trade_service->SetPushHandler({});
+		m_trade_service->SetReplyHandler({});
+		m_trade_service->SetDepthHandler({});
 	}
 	m_handler_market = {};
-	std::lock_guard<std::mutex> lock(m_mtx_clients);
+	std::lock_guard<std::mutex> lock(m_clients_mutex);
 	m_clients.clear();
-	m_clientTokens.clear();
-	m_bInitialized = false;
+	m_client_tokens.clear();
+	m_initialized = false;
 }
 
 bool CBrokerCenter::Initialize()
 {
-	if (m_bInitialized)
+	if (m_initialized)
 	{
 		return true;
 	}
-	if (nullptr == m_pTradeService)
+	if (nullptr == m_trade_service)
 	{
-		m_strLastError = "XBroker trade service is unavailable";
+		m_last_error = "XBroker trade service is unavailable";
 		return false;
 	}
-	m_pTradeService->SetCounterReplyHandler(std::bind_front(&CBrokerCenter::OnCounterReply, this));
-	m_pTradeService->SetCounterEventHandler(std::bind_front(&CBrokerCenter::OnCounterEvent, this));
-	m_pTradeService->SetPushHandler(std::bind_front(&CBrokerCenter::Broadcast, this));
-	m_pTradeService->SetReplyHandler(std::bind_front(&CBrokerCenter::OnReply, this));
-	m_pTradeService->SetDepthHandler(std::bind_front(&CBrokerCenter::ChangeDepthSubscription, this));
-	m_bInitialized = true;
+	m_trade_service->SetCounterReplyHandler(std::bind_front(&CBrokerCenter::OnCounterReply, this));
+	m_trade_service->SetCounterEventHandler(std::bind_front(&CBrokerCenter::OnCounterEvent, this));
+	m_trade_service->SetPushHandler(std::bind_front(&CBrokerCenter::Broadcast, this));
+	m_trade_service->SetReplyHandler(std::bind_front(&CBrokerCenter::OnReply, this));
+	m_trade_service->SetDepthHandler(std::bind_front(&CBrokerCenter::ChangeDepthSubscription, this));
+	m_initialized = true;
 	return true;
 }
 
@@ -97,12 +97,12 @@ bool CBrokerCenter::OnReply(net::_TyConnectionId id, const CRequest& req)
 
 bool CBrokerCenter::OnHQMarketReply(const CRequest& request)
 {
-	return m_pTradeService->OnHQMarketReply(request);
+	return m_trade_service->OnHQMarketReply(request);
 }
 
 void CBrokerCenter::OnHQMarketState(SessionState state, const std::string& message)
 {
-	m_pTradeService->OnHQMarketState(state, message);
+	m_trade_service->OnHQMarketState(state, message);
 }
 
 void CBrokerCenter::SetMarketHandler(_TyRequestNotify&& handler)
@@ -125,7 +125,7 @@ bool CBrokerCenter::Broadcast(const CRequest& req)
 {
 	std::vector<net::_TyConnectionId> clients;
 	{
-		std::lock_guard<std::mutex> lock(m_mtx_clients);
+		std::lock_guard<std::mutex> lock(m_clients_mutex);
 		clients.assign(m_clients.begin(), m_clients.end());
 	}
 	bool bSent = true;
@@ -139,7 +139,7 @@ bool CBrokerCenter::Broadcast(const CRequest& req)
 bool CBrokerCenter::HandleAuth(net::_TyConnectionId id, const CRequest& req)
 {
 	{
-		std::lock_guard<std::mutex> lock(m_mtx_clients);
+		std::lock_guard<std::mutex> lock(m_clients_mutex);
 		m_clients.erase(id);
 	}
 
@@ -163,12 +163,12 @@ bool CBrokerCenter::HandleReAuth(net::_TyConnectionId id, const CRequest& req)
 	std::string strToken = req.GetExtraData("token");
 	bool bAccepted = false;
 	{
-		std::lock_guard<std::mutex> lck(m_mtx_clients);
-		const auto mIter = m_clientTokens.find(strToken);
-		bAccepted = (m_clientTokens.end() != mIter) && (std::chrono::steady_clock::now() < mIter->second);
-		if ((m_clientTokens.end() != mIter) && !bAccepted)
+		std::lock_guard<std::mutex> lck(m_clients_mutex);
+		const auto mIter = m_client_tokens.find(strToken);
+		bAccepted = (m_client_tokens.end() != mIter) && (std::chrono::steady_clock::now() < mIter->second);
+		if ((m_client_tokens.end() != mIter) && !bAccepted)
 		{
-			m_clientTokens.erase(mIter);
+			m_client_tokens.erase(mIter);
 		}
 		if (bAccepted)
 		{
@@ -218,9 +218,9 @@ bool CBrokerCenter::Login(net::_TyConnectionId id, const CRequest& req, std::str
 	strToken = utility::MakeSaltHex();
 	response.SetExtraData("token", strToken);
 	{
-		std::lock_guard<std::mutex> lock(m_mtx_clients);
+		std::lock_guard<std::mutex> lock(m_clients_mutex);
 		m_clients.emplace(id);
-		m_clientTokens.insert_or_assign(strToken, std::chrono::steady_clock::now() + TokenLifetime);
+		m_client_tokens.insert_or_assign(strToken, std::chrono::steady_clock::now() + TokenLifetime);
 	}
 	net::SendRequest(id, response);
 	return true;
@@ -248,7 +248,7 @@ int CBrokerCenter::OnClientNetEvent(const net::CNetEvent& ev)
 	net::_TyConnectionId nConnection = ev.m_connection_id;
 	if (net::em_event::disconnected == ev.m_event || net::em_event::error == ev.m_event || net::em_event::timeout == ev.m_event)
 	{
-		std::lock_guard<std::mutex> lock(m_mtx_clients);
+		std::lock_guard<std::mutex> lock(m_clients_mutex);
 		m_clients.erase(nConnection);
 		return 1;
 	}
@@ -265,7 +265,7 @@ int CBrokerCenter::OnClientNetEvent(const net::CNetEvent& ev)
 
 	bool bAuthorized = false;
 	{
-		std::lock_guard<std::mutex> lock(m_mtx_clients);
+		std::lock_guard<std::mutex> lock(m_clients_mutex);
 		bAuthorized = container::with(m_clients, nConnection);
 	}
 	if (!bAuthorized)
@@ -296,7 +296,7 @@ int CBrokerCenter::OnClientNetEvent(const net::CNetEvent& ev)
 	case _TyRequest::TRADE_POSITION_QUERY:
 	case _TyRequest::TRADE_ORDER_QUERY:
 	case _TyRequest::TRADE_DEAL_QUERY:
-		m_pTradeService->OnRequest(request);
+		m_trade_service->OnRequest(request);
 		break;
 	default:
 		net::SendError(nConnection, request, static_cast<int>(trade::Error::Unsupported), "Unsupported XBroker request");
@@ -307,15 +307,15 @@ int CBrokerCenter::OnClientNetEvent(const net::CNetEvent& ev)
 
 const std::string& CBrokerCenter::GetLastError() const
 {
-	return m_strLastError;
+	return m_last_error;
 }
 
 void CBrokerCenter::OnCounterReply(const trade::CCounterReply& reply)
 {
-	m_pTradeService->OnCounterReply(reply);
+	m_trade_service->OnCounterReply(reply);
 }
 
 void CBrokerCenter::OnCounterEvent(const trade::CCountEvent& ev)
 {
-	m_pTradeService->OnCounterEvent(ev);
+	m_trade_service->OnCounterEvent(ev);
 }

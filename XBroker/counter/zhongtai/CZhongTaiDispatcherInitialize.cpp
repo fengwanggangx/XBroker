@@ -71,20 +71,20 @@ CResult CZhongTaiDispatcher::Initialize()
 			return { Error::Rejected, "invalid ZhongTai configuration" };
 		}
 		CConfig config;
-		config.m_softwareKey = Text(document, "software_key");
-		config.m_softwareVersion = Text(document, "software_version");
-		config.m_logPath = Text(document, "log_path");
+		config.m_software_key = Text(document, "software_key");
+		config.m_software_version = Text(document, "software_version");
+		config.m_log_path = Text(document, "log_path");
 		if (!document.HasMember("client_id") || !document["client_id"].IsUint() || 1 > document["client_id"].GetUint() || 99 < document["client_id"].GetUint())
 		{
 			throw std::runtime_error("client_id must be 1..99");
 		}
-		config.m_clientId = document["client_id"].GetUint();
-		config.m_queueLimit = static_cast<std::size_t>(Number(document, "queue_limit", 4096, 64, 65536));
-		config.m_queryTimeoutMs = static_cast<std::int64_t>(Number(document, "query_timeout_ms", 10000, 100, 10000));
-		config.m_queryIntervalMs = static_cast<std::int64_t>(Number(document, "query_interval_ms", 200, 20, 1000));
-		config.m_refreshMs = static_cast<std::int64_t>(Number(document, "refresh_ms", 5000, 1000, 60000));
+		config.m_client_id = document["client_id"].GetUint();
+		config.m_queue_limit = static_cast<std::size_t>(Number(document, "queue_limit", 4096, 64, 65536));
+		config.m_query_timeout_ms = static_cast<std::int64_t>(Number(document, "query_timeout_ms", 10000, 100, 10000));
+		config.m_query_interval_ms = static_cast<std::int64_t>(Number(document, "query_interval_ms", 200, 20, 1000));
+		config.m_refresh_ms = static_cast<std::int64_t>(Number(document, "refresh_ms", 5000, 1000, 60000));
 
-		if (config.m_softwareKey.empty() || config.m_softwareVersion.empty() || config.m_logPath.empty())
+		if (config.m_software_key.empty() || config.m_software_version.empty() || config.m_log_path.empty())
 		{
 			throw std::runtime_error("SDK key,version,log_path required");
 		}
@@ -96,15 +96,15 @@ CResult CZhongTaiDispatcher::Initialize()
 				throw std::runtime_error("invalid ZhongTai site");
 			}
 			CSite site;
-			site.m_brokerId = value["broker_id"].GetUint64();
+			site.m_broker_id = value["broker_id"].GetUint64();
 			site.m_name = Text(value, "name");
 			site.m_host = Text(value, "host");
 			site.m_port = value["port"].GetInt();
 			if (value.HasMember("local_ip"))
 			{
-				site.m_localIp = Text(value, "local_ip");
+				site.m_local_ip = Text(value, "local_ip");
 			}
-			if (site.m_name.empty() || site.m_host.empty() || !names.emplace(site.m_brokerId, site.m_name).second)
+			if (site.m_name.empty() || site.m_host.empty() || !names.emplace(site.m_broker_id, site.m_name).second)
 			{
 				throw std::runtime_error("empty or duplicate ZhongTai site");
 			}
@@ -114,7 +114,7 @@ CResult CZhongTaiDispatcher::Initialize()
 		{
 			throw std::runtime_error("at least one ZhongTai site required");
 		}
-		std::filesystem::create_directories(config.m_logPath);
+		std::filesystem::create_directories(config.m_log_path);
 		m_config = std::move(config);
 		m_api = CreateZhongTaiApi(m_config);
 		m_store = std::make_unique<CZhongTaiStore>(utility::MakeSaltHex());

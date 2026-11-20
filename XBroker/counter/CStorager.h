@@ -15,7 +15,7 @@ namespace trade
 
 	private:
 		bool CheckFence(db::IDataBase& session, bool bAcquire);
-		std::string m_strOwner;
+		std::string m_owner;
 		std::uint64_t m_fence{ 0 };
 	};
 } // namespace trade

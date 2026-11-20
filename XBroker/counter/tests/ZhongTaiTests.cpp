@@ -58,17 +58,17 @@ namespace
 	public:
 		void Stop() override
 		{
-			std::lock_guard<std::mutex> lock(m_mtx_state);
+			std::lock_guard<std::mutex> lock(m_state_mutex);
 			m_handler = {};
 		}
 		void SetHandler(_TyHandler&& handler) override
 		{
-			std::lock_guard<std::mutex> lock(m_mtx_state);
+			std::lock_guard<std::mutex> lock(m_state_mutex);
 			m_handler = std::move(handler);
 		}
 		CLoginReply Login(const CSite& site, const std::string& account, const std::string& password) override
 		{
-			std::lock_guard<std::mutex> lock(m_mtx_state);
+			std::lock_guard<std::mutex> lock(m_state_mutex);
 			++m_logins;
 			if ("bad" == password)
 			{
@@ -84,7 +84,7 @@ namespace
 		}
 		CResult Query(std::uint64_t session, Operation operation, int requestId, std::int64_t reference) override
 		{
-			if (m_queryFailure.exchange(false))
+			if (m_query_failure.exchange(false))
 			{
 				return { Error::Unavailable, "query rejected" };
 			}
@@ -94,16 +94,16 @@ namespace
 			}
 			CApiEvent event;
 			event.m_session = session;
-			event.m_requestId = requestId;
+			event.m_request_id = requestId;
 			event.m_last = true;
 			if (Operation::Funds == operation)
 			{
 				event.m_type = ApiEventType::Funds;
-				event.m_hasRow = true;
-				event.m_funds.m_nBalance = 10000000;
-				event.m_funds.m_nAvailable = 9000000;
-				event.m_funds.m_nFrozen = 1000000;
-				event.m_funds.m_bExplicitAvailable = true;
+				event.m_has_row = true;
+				event.m_funds.m_balance = 10000000;
+				event.m_funds.m_available = 9000000;
+				event.m_funds.m_frozen = 1000000;
+				event.m_funds.m_explicit_available = true;
 			}
 			if (Operation::Positions == operation)
 			{
@@ -114,12 +114,12 @@ namespace
 				event.m_type = ApiEventType::Order;
 				std::vector<COrder> orders;
 				{
-					std::lock_guard<std::mutex> lock(m_mtx_state);
+					std::lock_guard<std::mutex> lock(m_state_mutex);
 					orders = m_orders[m_accounts.at(session)];
 				}
 				if (m_pages.load() && !orders.empty())
 				{
-					++m_pageCalls;
+					++m_page_calls;
 					if (0 == reference)
 					{
 						for (int index = 0; index < 1000; ++index)
@@ -127,7 +127,7 @@ namespace
 							CApiEvent row = event;
 							row.m_last = false;
 							row.m_order = orders.front();
-							row.m_hasRow = true;
+							row.m_has_row = true;
 							Emit(row);
 						}
 						event.m_reference = 1000;
@@ -140,7 +140,7 @@ namespace
 					CApiEvent row = event;
 					row.m_last = false;
 					row.m_order = order;
-					row.m_hasRow = true;
+					row.m_has_row = true;
 					Emit(row);
 				}
 			}
@@ -153,17 +153,17 @@ namespace
 		}
 		CResult Submit(std::uint64_t session, const COrder& order, std::uint64_t& brokerId) override
 		{
-			if (m_throwSubmit.exchange(false))
+			if (m_throw_submit.exchange(false))
 			{
 				throw std::runtime_error("injected unknown send");
 			}
 			COrder row = order;
 			{
-				std::lock_guard<std::mutex> lock(m_mtx_state);
+				std::lock_guard<std::mutex> lock(m_state_mutex);
 				brokerId = ++m_order;
-				row.m_strBrokerOrderId = std::to_string(brokerId);
-				row.m_status = m_rejectNext.exchange(false) ? Status::Rejected : Status::Accepted;
-				row.m_nBrokerTime = 20261030100000000LL;
+				row.m_broker_order_id = std::to_string(brokerId);
+				row.m_status = m_reject_next.exchange(false) ? Status::Rejected : Status::Accepted;
+				row.m_broker_time = 20261030100000000LL;
 				m_orders[m_accounts.at(session)].push_back(row);
 				++m_submits;
 			}
@@ -171,7 +171,7 @@ namespace
 			event.m_session = session;
 			event.m_type = ApiEventType::Order;
 			event.m_order = row;
-			event.m_hasRow = true;
+			event.m_has_row = true;
 			Emit(event);
 			return {};
 		}
@@ -179,25 +179,25 @@ namespace
 		{
 			CApiEvent event;
 			event.m_session = session;
-			if (m_cancelFailure.exchange(false))
+			if (m_cancel_failure.exchange(false))
 			{
 				event.m_type = ApiEventType::CancelError;
-				event.m_cancelOrder = id;
+				event.m_cancel_order = id;
 				event.m_result = { Error::Rejected, "cancel rejected" };
 				Emit(event);
 				return {};
 			}
 			event.m_type = ApiEventType::Order;
 			{
-				std::lock_guard<std::mutex> lock(m_mtx_state);
+				std::lock_guard<std::mutex> lock(m_state_mutex);
 				for (auto& order : m_orders[m_accounts.at(session)])
 				{
-					if (std::to_string(id) == order.m_strBrokerOrderId)
+					if (std::to_string(id) == order.m_broker_order_id)
 					{
 						order.m_status = Status::Cancelled;
-						order.m_nBrokerTime++;
+						order.m_broker_time++;
 						event.m_order = order;
-						event.m_hasRow = true;
+						event.m_has_row = true;
 					}
 				}
 			}
@@ -209,7 +209,7 @@ namespace
 		{
 			_TyHandler handler;
 			{
-				std::lock_guard<std::mutex> lock(m_mtx_state);
+				std::lock_guard<std::mutex> lock(m_state_mutex);
 				handler = m_handler;
 			}
 			if (nullptr != handler)
@@ -218,9 +218,9 @@ namespace
 			}
 		}
 		std::atomic_int m_submits{ 0 }, m_logins{ 0 };
-		std::atomic_bool m_queryFailure{ false }, m_hang{ false }, m_pages{ false }, m_throwSubmit{ false }, m_cancelFailure{ false }, m_rejectNext{ false };
-		std::atomic_int m_pageCalls{ 0 };
-		std::mutex m_mtx_state;
+		std::atomic_bool m_query_failure{ false }, m_hang{ false }, m_pages{ false }, m_throw_submit{ false }, m_cancel_failure{ false }, m_reject_next{ false };
+		std::atomic_int m_page_calls{ 0 };
+		std::mutex m_state_mutex;
 		std::vector<std::string> m_hosts;
 		std::map<std::string, std::vector<COrder>> m_orders;
 
@@ -231,7 +231,7 @@ namespace
 	};
 	CCounterReply Send(const std::shared_ptr<ITradeSession>& counter, CReqParam request)
 	{
-		request.m_correlationId = 987654;
+		request.m_correlation_id = 987654;
 		std::shared_ptr<std::promise<CCounterReply>> promise = std::make_shared<std::promise<CCounterReply>>();
 		std::future<CCounterReply> future = promise->get_future();
 		Check(countertest::SendRequest(*counter, std::move(request), [promise](const CCounterReply& reply)
@@ -241,15 +241,15 @@ namespace
 			  "request enqueued");
 		Check(std::future_status::ready == future.wait_for(std::chrono::seconds(4)), "request callback completed");
 		CCounterReply reply = future.get();
-		Check(987654 == reply.m_correlationId, "XTP reply preserves internal correlation");
+		Check(987654 == reply.m_correlation_id, "XTP reply preserves internal correlation");
 		return reply;
 	}
 
 	CReqParam Request(const _TyAccount& account, Operation operation)
 	{
 		CReqParam request;
-		request.m_accountIndex = account;
-		request.m_requestId = 1;
+		request.m_account_index = account;
+		request.m_request_id = 1;
 		if (Operation::Login == operation)
 		{
 			request.m_param = CLoginParam{ "secret", 1 == account.first ? "primary" : "secondary" };
@@ -261,10 +261,10 @@ namespace
 		else if (Operation::Submit == operation)
 		{
 			COrder order;
-			order.m_clientId = 1;
-			order.m_strSecurity = "600000.SSE";
-			order.m_nPrice = 1000;
-			order.m_nQuantity = 100;
+			order.m_client_id = 1;
+			order.m_security = "600000.SSE";
+			order.m_price = 1000;
+			order.m_quantity = 100;
 			request.m_param = CSubmitParam{ order };
 		}
 		else if (Operation::Cancel == operation)
@@ -295,10 +295,10 @@ namespace
 		Check(IsStock("600000.SSE") && IsStock("000001.SZSE") && !IsStock("510300.SSE"), "ordinary stocks only");
 		Check(1793325600000LL == BrokerTime(20261030100000000LL), "Shanghai epoch conversion");
 		CConfig config;
-		config.m_queryIntervalMs = 0;
+		config.m_query_interval_ms = 0;
 		// Allow the 1000-row pagination fixture to run under debug iterators.
-		config.m_queryTimeoutMs = 1000;
-		config.m_refreshMs = 60000;
+		config.m_query_timeout_ms = 1000;
+		config.m_refresh_ms = 60000;
 		config.m_sites = { { 1, "primary", "host-a", "", 1 }, { 2, "secondary", "host-b", "", 2 } };
 		std::shared_ptr<CMemory> memory = std::make_shared<CMemory>();
 		std::unique_ptr<CApi> api = std::make_unique<CApi>();
@@ -312,61 +312,61 @@ namespace
 		Check(Send(first, Request(a, Operation::Login)).m_result.Ok(), "first login and synchronization");
 		Check(Send(second, Request(b, Operation::Login)).m_result.Ok(), "second login different site");
 		{
-			std::lock_guard<std::mutex> lock(fake->m_mtx_state);
+			std::lock_guard<std::mutex> lock(fake->m_state_mutex);
 			Check(2 == fake->m_hosts.size() && "host-a" == fake->m_hosts[0] && "host-b" == fake->m_hosts[1], "independent login endpoints");
 		}
 		Check(!Send(first, Request(a, Operation::Login)).m_result.Ok(), "duplicate login rejected");
 		CCounterReply funds = Send(first, Request(a, Operation::Funds));
-		Check(funds.m_result.Ok() && 9000000 == std::get<CFunds>(funds.m_data).m_nAvailable, "explicit broker available cash");
+		Check(funds.m_result.Ok() && 9000000 == std::get<CFunds>(funds.m_data).m_available, "explicit broker available cash");
 		CCounterReply accepted = Send(first, Request(a, Operation::Submit));
 		Check(accepted.m_result.Ok(), "submit");
-		std::uint64_t id = std::get<COperationReceipt>(accepted.m_data).m_orderId;
+		std::uint64_t id = std::get<COperationReceipt>(accepted.m_data).m_order_id;
 		Send(first, Request(a, Operation::Orders));
 		Check(Send(first, Request(a, Operation::Submit)).m_result.Ok() && 1 == fake->m_submits.load(), "duplicate submit does not send twice");
 		fake->m_pages = true;
 		Check(Send(first, Request(a, Operation::Orders)).m_result.Ok(), "paginated query completes");
 		fake->m_pages = false;
-		Check(2 <= fake->m_pageCalls.load() && 0 == fake->m_pageCalls.load() % 2, "full page follows continuation cursor");
+		Check(2 <= fake->m_page_calls.load() && 0 == fake->m_page_calls.load() % 2, "full page follows continuation cursor");
 		CReqParam conflict = Request(a, Operation::Submit);
-		std::get<CSubmitParam>(conflict.m_param).m_order.m_nQuantity = 200;
+		std::get<CSubmitParam>(conflict.m_param).m_order.m_quantity = 200;
 		Check(Error::Conflict == Send(first, conflict).m_result.m_error, "conflicting duplicate rejected");
 		CApiEvent trade;
 		trade.m_type = ApiEventType::Trade;
 		trade.m_session = 1;
-		trade.m_hasRow = true;
-		trade.m_trade.m_strBrokerOrderId = "1001";
-		trade.m_trade.m_strBrokerTradeId = "same-exec";
-		trade.m_trade.m_nDay = 20261030;
+		trade.m_has_row = true;
+		trade.m_trade.m_broker_order_id = "1001";
+		trade.m_trade.m_broker_trade_id = "same-exec";
+		trade.m_trade.m_day = 20261030;
 		trade.m_trade.m_market = 1;
-		trade.m_trade.m_reportIndex = 1;
-		trade.m_trade.m_nQuantity = 20;
-		trade.m_trade.m_nPrice = 100000;
-		trade.m_trade.m_nPriceScale = 4;
-		trade.m_trade.m_strSecurity = "600000.SSE";
+		trade.m_trade.m_report_index = 1;
+		trade.m_trade.m_quantity = 20;
+		trade.m_trade.m_price = 100000;
+		trade.m_trade.m_price_scale = 4;
+		trade.m_trade.m_security = "600000.SSE";
 		fake->Emit(trade);
 		fake->Emit(trade);
-		trade.m_trade.m_reportIndex = 2;
+		trade.m_trade.m_report_index = 2;
 		fake->Emit(trade);
 		Send(first, Request(a, Operation::Orders));
 		CAccountData snapshot = first->Snapshot();
-		Check(2 == snapshot.m_trades.size() && 40 == snapshot.m_orders.front().m_nFilled, "report index dedup and partial fills");
+		Check(2 == snapshot.m_trades.size() && 40 == snapshot.m_orders.front().m_filled, "report index dedup and partial fills");
 		Check(second->Snapshot().m_orders.empty(), "account isolation");
 		CReqParam cancel = Request(a, Operation::Cancel);
-		std::get<CCancelParam>(cancel.m_param).m_orderId = id;
-		fake->m_cancelFailure = true;
+		std::get<CCancelParam>(cancel.m_param).m_order_id = id;
+		fake->m_cancel_failure = true;
 		Check(Send(first, cancel).m_result.Ok(), "cancel send receipt");
 		Send(first, Request(a, Operation::Orders));
-		Check(!first->Snapshot().m_orders.front().m_bCancelPending && Status::PartiallyFilled == first->Snapshot().m_orders.front().m_status, "cancel rejection keeps active order");
+		Check(!first->Snapshot().m_orders.front().m_cancel_pending && Status::PartiallyFilled == first->Snapshot().m_orders.front().m_status, "cancel rejection keeps active order");
 		Check(Send(first, cancel).m_result.Ok(), "cancel queued");
 		Send(first, Request(a, Operation::Orders));
 		Check(Status::Cancelled == first->Snapshot().m_orders.front().m_status, "terminal cancellation");
 		CApiEvent stale;
 		stale.m_type = ApiEventType::Order;
 		stale.m_session = 1;
-		stale.m_hasRow = true;
+		stale.m_has_row = true;
 		stale.m_order = first->Snapshot().m_orders.front();
 		stale.m_order.m_status = Status::Accepted;
-		stale.m_order.m_nBrokerTime = 1;
+		stale.m_order.m_broker_time = 1;
 		fake->Emit(stale);
 		Send(first, Request(a, Operation::Orders));
 		Check(Status::Cancelled == first->Snapshot().m_orders.front().m_status, "stale callback cannot regress terminal order");
@@ -374,42 +374,42 @@ namespace
 		CApiEvent external;
 		external.m_type = ApiEventType::Order;
 		external.m_session = 1;
-		external.m_hasRow = true;
+		external.m_has_row = true;
 		external.m_order = first->Snapshot().m_orders.front();
-		external.m_order.m_strBrokerOrderId = "90001";
-		external.m_order.m_sdkClientId = 0;
-		external.m_order.m_clientId = 0;
-		external.m_order.m_strategyId = 0;
+		external.m_order.m_broker_order_id = "90001";
+		external.m_order.m_sdk_client_id = 0;
+		external.m_order.m_client_id = 0;
+		external.m_order.m_strategy_id = 0;
 		external.m_order.m_status = Status::Accepted;
-		external.m_order.m_nFilled = 0;
-		external.m_order.m_nBrokerTime = 20261030101000000LL;
+		external.m_order.m_filled = 0;
+		external.m_order.m_broker_time = 20261030101000000LL;
 		{
-			std::lock_guard<std::mutex> lock(fake->m_mtx_state);
+			std::lock_guard<std::mutex> lock(fake->m_state_mutex);
 			fake->m_orders[a.second].push_back(external.m_order);
 		}
 		fake->Emit(external);
 		Send(first, Request(a, Operation::Orders));
-		Check(2 == first->Snapshot().m_orders.size() && 0 == first->Snapshot().m_orders.back().m_clientId, "external terminal order has no invented strategy association");
+		Check(2 == first->Snapshot().m_orders.size() && 0 == first->Snapshot().m_orders.back().m_client_id, "external terminal order has no invented strategy association");
 		CReqParam rejected = Request(a, Operation::Submit);
-		std::get<CSubmitParam>(rejected.m_param).m_order.m_clientId = 2;
-		fake->m_rejectNext = true;
+		std::get<CSubmitParam>(rejected.m_param).m_order.m_client_id = 2;
+		fake->m_reject_next = true;
 		Check(Send(first, rejected).m_result.Ok(), "SDK receipt precedes rejection");
 		Send(first, Request(a, Operation::Orders));
 		Check(Status::Rejected == first->Snapshot().m_orders.back().m_status, "broker rejection is final");
 		CReqParam filled = Request(a, Operation::Submit);
-		std::get<CSubmitParam>(filled.m_param).m_order.m_clientId = 3;
+		std::get<CSubmitParam>(filled.m_param).m_order.m_client_id = 3;
 		Check(Send(first, filled).m_result.Ok(), "next order after rejection");
 		Send(first, Request(a, Operation::Orders));
-		trade.m_trade.m_strBrokerOrderId = "1003";
-		trade.m_trade.m_reportIndex = 3;
-		trade.m_trade.m_nQuantity = 100;
+		trade.m_trade.m_broker_order_id = "1003";
+		trade.m_trade.m_report_index = 3;
+		trade.m_trade.m_quantity = 100;
 		fake->Emit(trade);
 		Send(first, Request(a, Operation::Orders));
 		Check(Status::Filled == first->Snapshot().m_orders.back().m_status, "complete fill from trade callback");
 		CTrade tomorrow = trade.m_trade;
-		++tomorrow.m_nDay;
+		++tomorrow.m_day;
 		Check(TradeKey(tomorrow) != TradeKey(trade.m_trade), "cross-day reports remain distinct");
-		fake->m_queryFailure = true;
+		fake->m_query_failure = true;
 		Check(!Send(first, Request(a, Operation::Funds)).m_result.Ok(), "query failure is not empty success");
 		std::this_thread::sleep_for(std::chrono::milliseconds(1200));
 		Check(Send(first, Request(a, Operation::Funds)).m_result.Ok(), "automatic reconnect and synchronize");
@@ -419,7 +419,7 @@ namespace
 		fake->m_hang = true;
 		Check(Error::Timeout == Send(first, Request(a, Operation::Funds)).m_result.m_error, "query timeout completed");
 		gateway->Stop();
-		Check(!first->Snapshot().m_bReady, "stop invalidates snapshot");
+		Check(!first->Snapshot().m_ready, "stop invalidates snapshot");
 		std::uint64_t sequence = memory->m_data[a].sequence();
 		Check(0 < sequence && 4 == memory->m_data[a].orders_size(), "durable journal preserved");
 		std::unique_ptr<CApi> restartApi = std::make_unique<CApi>();
@@ -434,8 +434,8 @@ namespace
 	void SessionLifecycle()
 	{
 		CConfig config;
-		config.m_queryIntervalMs = 0;
-		config.m_refreshMs = 60000;
+		config.m_query_interval_ms = 0;
+		config.m_refresh_ms = 60000;
 		config.m_sites = { { 1, "primary", "host-a", "", 1 }, { 2, "secondary", "host-b", "", 2 } };
 		std::unique_ptr<CZhongTaiDispatcher> dispatcher = std::make_unique<CZhongTaiDispatcher>(config, std::make_unique<CApi>(), std::make_unique<CStore>(std::make_shared<CMemory>()));
 		dispatcher->Start();
@@ -452,7 +452,7 @@ namespace
 			  "mismatch rejected without callback");
 		Check(Send(first, Request(a, Operation::Disconnect)).m_result.Ok(), "business disconnect acknowledged");
 		first->Close();
-		Check(!first->Snapshot().m_bReady && !countertest::SendRequest(*first, Request(a, Operation::Funds), {}).Ok(), "closed account unavailable");
+		Check(!first->Snapshot().m_ready && !countertest::SendRequest(*first, Request(a, Operation::Funds), {}).Ok(), "closed account unavailable");
 		Check(Send(second, Request(b, Operation::Funds)).m_result.Ok(), "closing first preserves shared dispatcher");
 		std::shared_ptr<ITradeSession> replacement = dispatcher->Create({ a, "zhongtai_xtp" });
 		Check(Send(replacement, Request(a, Operation::Login)).m_result.Ok(), "replacement account login");
@@ -465,7 +465,7 @@ namespace
 			  "stopped dispatcher rejects without callback");
 		Check(nullptr == dispatcher->Create({ a, "zhongtai_xtp" }), "stopped dispatcher cannot create sessions");
 		dispatcher.reset();
-		Check(!countertest::SendRequest(*replacement, Request(a, Operation::Funds), {}).Ok() && !replacement->Snapshot().m_bReady, "session remains safely closed after dispatcher destruction");
+		Check(!countertest::SendRequest(*replacement, Request(a, Operation::Funds), {}).Ok() && !replacement->Snapshot().m_ready, "session remains safely closed after dispatcher destruction");
 	}
 
 	void DispatcherDestruction()
@@ -478,15 +478,15 @@ namespace
 			dispatcher.Start();
 			session = dispatcher.Create({ account, "zhongtai_xtp" });
 		}
-		Check(!countertest::SendRequest(*session, Request(account, Operation::Funds), {}).Ok() && !session->Snapshot().m_bReady, "session detached by dispatcher destructor");
+		Check(!countertest::SendRequest(*session, Request(account, Operation::Funds), {}).Ok() && !session->Snapshot().m_ready, "session detached by dispatcher destructor");
 		session->Close();
 	}
 
 	void Failures()
 	{
 		CConfig config;
-		config.m_queryIntervalMs = 0;
-		config.m_refreshMs = 60000;
+		config.m_query_interval_ms = 0;
+		config.m_refresh_ms = 60000;
 		config.m_sites = { { 1, "primary", "host-a", "", 1 } };
 		std::shared_ptr<CMemory> memory = std::make_shared<CMemory>();
 		std::unique_ptr<CApi> api = std::make_unique<CApi>();
@@ -496,17 +496,17 @@ namespace
 		_TyAccount account{ 1, "000999" };
 		std::shared_ptr<ITradeSession> counter = gateway->Create({ account, "zhongtai_xtp" });
 		CReqParam bad = Request(account, Operation::Login);
-		std::get<CLoginParam>(bad.m_param).m_strPassword = "bad";
+		std::get<CLoginParam>(bad.m_param).m_password = "bad";
 		Check(!Send(counter, bad).m_result.Ok(), "authentication error rejected");
 		std::this_thread::sleep_for(std::chrono::milliseconds(1100));
 		Check(1 == fake->m_logins.load(), "authentication does not retry");
 		Check(Send(counter, Request(account, Operation::Login)).m_result.Ok(), "manual login after failure");
-		fake->m_throwSubmit = true;
+		fake->m_throw_submit = true;
 		Check(Error::UnknownResult == Send(counter, Request(account, Operation::Submit)).m_result.m_error, "ambiguous send never treated as rejection");
 		std::this_thread::sleep_for(std::chrono::milliseconds(1200));
 		Check(Error::UnknownResult == Send(counter, Request(account, Operation::Submit)).m_result.m_error && 0 == fake->m_submits.load(), "uncertain intent not automatically resent");
 		CReqParam next = Request(account, Operation::Submit);
-		std::get<CSubmitParam>(next.m_param).m_order.m_clientId = 2;
+		std::get<CSubmitParam>(next.m_param).m_order.m_client_id = 2;
 		memory->m_fail = true;
 		Check(!Send(counter, next).m_result.Ok() && 0 == fake->m_submits.load(), "storage failure prevents SDK send");
 		gateway->Stop();
@@ -515,8 +515,8 @@ namespace
 	void Overflow()
 	{
 		CConfig config;
-		config.m_queryIntervalMs = 0;
-		config.m_queueLimit = 8;
+		config.m_query_interval_ms = 0;
+		config.m_queue_limit = 8;
 		config.m_sites = { { 1, "primary", "host-a", "", 1 } };
 		std::shared_ptr<CMemory> memory = std::make_shared<CMemory>();
 		std::unique_ptr<CApi> api = std::make_unique<CApi>();
@@ -530,7 +530,7 @@ namespace
 		Send(counter, Request(account, Operation::Funds));
 		fake->m_pages = true;
 		Check(!Send(counter, Request(account, Operation::Orders)).m_result.Ok(), "callback overflow fails outstanding query");
-		Check(!counter->Snapshot().m_bReady, "overflow invalidates cache");
+		Check(!counter->Snapshot().m_ready, "overflow invalidates cache");
 		gateway->Stop();
 	}
 

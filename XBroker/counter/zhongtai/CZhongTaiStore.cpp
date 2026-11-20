@@ -139,8 +139,8 @@ namespace trade::zhongtai
 		{
 			return Failure();
 		}
-		m_orderRows[account] = std::move(orders);
-		m_tradeRows[account] = std::move(trades);
+		m_order_rows[account] = std::move(orders);
+		m_trade_rows[account] = std::move(trades);
 		journal = std::move(restored);
 		return {};
 	}
@@ -167,8 +167,8 @@ namespace trade::zhongtai
 		for (const auto& order : journal.orders())
 		{
 			std::string body = order.SerializeAsString();
-			const auto mIter = m_orderRows[account].find(order.order_id());
-			if (m_orderRows[account].end() == mIter || body != mIter->second)
+			const auto mIter = m_order_rows[account].find(order.order_id());
+			if (m_order_rows[account].end() == mIter || body != mIter->second)
 			{
 				if (0 != database->ExecUpdate("INSERT INTO xtp_orders VALUES(" + key + "," + std::to_string(order.order_id()) + "," + Hex(body) + ") ON DUPLICATE KEY UPDATE payload=VALUES(payload)"))
 				{
@@ -180,8 +180,8 @@ namespace trade::zhongtai
 		for (const auto& trade : journal.trades())
 		{
 			std::string body = trade.SerializeAsString();
-			const auto mIter = m_tradeRows[account].find(trade.trade_id());
-			if (m_tradeRows[account].end() == mIter || body != mIter->second)
+			const auto mIter = m_trade_rows[account].find(trade.trade_id());
+			if (m_trade_rows[account].end() == mIter || body != mIter->second)
 			{
 				if (0 != database->ExecUpdate("INSERT INTO xtp_trades VALUES(" + key + "," + std::to_string(trade.trade_id()) + "," + Hex(body) + ") ON DUPLICATE KEY UPDATE payload=VALUES(payload)"))
 				{
@@ -208,11 +208,11 @@ namespace trade::zhongtai
 		}
 		for (auto& item : changedOrders)
 		{
-			m_orderRows[account].insert_or_assign(item.first, std::move(item.second));
+			m_order_rows[account].insert_or_assign(item.first, std::move(item.second));
 		}
 		for (auto& item : changedTrades)
 		{
-			m_tradeRows[account].insert_or_assign(item.first, std::move(item.second));
+			m_trade_rows[account].insert_or_assign(item.first, std::move(item.second));
 		}
 		journal.set_revision(next.revision());
 		journal.clear_events();

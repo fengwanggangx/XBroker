@@ -37,8 +37,8 @@ namespace trade
 		virtual void Close() = 0;
 
 	private:
-		inline static std::atomic_uint64_t m_nextId{ 1 };
-		const std::uint64_t m_id{ m_nextId.fetch_add(1, std::memory_order_relaxed) };
+		inline static std::atomic_uint64_t m_next_id{ 1 };
+		const std::uint64_t m_id{ m_next_id.fetch_add(1, std::memory_order_relaxed) };
 	};
 	class ICounterStore
 	{

@@ -28,7 +28,7 @@ class CLoginServiceTests
 		void SetReplyHandler(_TyReplyHandler handler) override
 		{
 			m_handler_reply = std::move(handler);
-			++m_replyRegistrations;
+			++m_reply_registrations;
 		}
 		void SetEventHandler(_TyEventHandler handler) override
 		{
@@ -45,9 +45,9 @@ class CLoginServiceTests
 			std::pair<trade::CReqParam, _TyReplyHandler> work = std::move(m_pending.at(index));
 			m_pending.erase(m_pending.begin() + index);
 			trade::CCounterReply reply;
-			reply.m_accountIndex = work.first.m_accountIndex;
-			reply.m_requestId = work.first.m_requestId;
-			reply.m_correlationId = work.first.m_correlationId;
+			reply.m_account_index = work.first.m_account_index;
+			reply.m_request_id = work.first.m_request_id;
+			reply.m_correlation_id = work.first.m_correlation_id;
 			reply.m_operation = work.first.GetOperation();
 			reply.m_data = trade::COperationReceipt{};
 			if (trade::Operation::Funds == reply.m_operation)
@@ -65,15 +65,15 @@ class CLoginServiceTests
 		void Emit(const _TyAccount& account, bool connected)
 		{
 			trade::CCountEvent event;
-			event.m_sessionId = GetId();
-			event.m_accountIndex = account;
-			event.m_funds.m_bConnected = connected;
+			event.m_session_id = GetId();
+			event.m_account_index = account;
+			event.m_funds.m_connected = connected;
 			m_events(event);
 		}
 
 		std::size_t GetReplyRegistrationCount() const
 		{
-			return m_replyRegistrations;
+			return m_reply_registrations;
 		}
 
 		void RejectNext()
@@ -88,7 +88,7 @@ class CLoginServiceTests
 
 		void DropOnClose()
 		{
-			m_dropOnClose = true;
+			m_drop_on_close = true;
 		}
 
 		bool IsClosed() const
@@ -99,7 +99,7 @@ class CLoginServiceTests
 		void Close() override
 		{
 			m_closed = true;
-			if (m_dropOnClose)
+			if (m_drop_on_close)
 			{
 				m_pending.clear();
 			}
@@ -111,11 +111,11 @@ class CLoginServiceTests
 
 	private:
 		_TyReplyHandler m_handler_reply;
-		std::size_t m_replyRegistrations{ 0 };
+		std::size_t m_reply_registrations{ 0 };
 		bool m_closed{ false };
 		bool m_reject{ false };
 		bool m_immediate{ false };
-		bool m_dropOnClose{ false };
+		bool m_drop_on_close{ false };
 		std::deque<std::pair<trade::CReqParam, _TyReplyHandler>> m_pending;
 		_TyEventHandler m_events;
 	};
@@ -133,9 +133,9 @@ public:
 	{
 		CTradeService service;
 		// Exercise deadlines deterministically without racing the response assertions.
-		service.m_pendingThread.request_stop();
+		service.m_pending_thread.request_stop();
 		service.m_condition_pending.notify_all();
-		service.m_pendingThread.join();
+		service.m_pending_thread.join();
 		service.SetCounterReplyHandler(std::bind_front(&CTradeService::OnCounterReply, &service));
 		service.SetCounterEventHandler(std::bind_front(&CTradeService::OnCounterEvent, &service));
 		std::vector<CRequest> responses;
@@ -147,9 +147,9 @@ public:
 			return true;
 		});
 		CBrokerInfo broker;
-		broker.m_strAdapter = "fake";
-		broker.m_brokerId = 17;
-		broker.m_strName = "Broker";
+		broker.m_adapter = "fake";
+		broker.m_broker_id = 17;
+		broker.m_name = "Broker";
 		broker.m_sites.emplace("default");
 		service.m_brokers.emplace(17, std::move(broker));
 		std::vector<std::shared_ptr<CFake>> sessions;
@@ -180,11 +180,11 @@ public:
 		Check(2 == sessions.size(), "connected duplicate reuses session");
 		Check(0 != sessions.back()->GetId() && sessions.front()->GetId() != sessions.back()->GetId(), "each session has an immutable unique id");
 		trade::CCountEvent stale;
-		stale.m_accountIndex = account;
-		stale.m_sessionId = sessions.front()->GetId();
+		stale.m_account_index = account;
+		stale.m_session_id = sessions.front()->GetId();
 		service.OnCounterEvent(stale);
 		Check(TradeAccountState::Connected == service.m_accounts.at(account).m_info.m_state, "old session id rejected for the same account");
-		stale.m_sessionId = 0;
+		stale.m_session_id = 0;
 		service.OnCounterEvent(stale);
 		Check(TradeAccountState::Connected == service.m_accounts.at(account).m_info.m_state, "missing session id rejected");
 		sessions.back()->Emit({ 99, "other" }, false);
@@ -201,13 +201,13 @@ public:
 		Check(202 == connections.back() && 1001 == responses.back().GetId(), "out-of-order reply returns to second client");
 		trade::CCounterReply first = sessions.back()->Complete(true);
 		Check(101 == connections.back() && 1001 == responses.back().GetId(), "first asynchronous reply returns to first client");
-		Check(first.m_correlationId != second.m_correlationId && 1001 == first.m_requestId && 1001 == second.m_requestId, "internal correlation is unique without changing business request ids");
+		Check(first.m_correlation_id != second.m_correlation_id && 1001 == first.m_request_id && 1001 == second.m_request_id, "internal correlation is unique without changing business request ids");
 		std::size_t completedCount = responses.size();
 		service.OnCounterReply(first);
 		Check(completedCount == responses.size() && service.m_pending.empty(), "duplicate reply ignored");
 		Check(service.OnRequest(funds), "timeout query queued");
 		{
-			std::lock_guard<std::mutex> lock(service.m_mtx_pending);
+			std::lock_guard<std::mutex> lock(service.m_pending_mutex);
 			service.m_pending.begin()->second.m_deadline = std::chrono::steady_clock::time_point::min();
 		}
 		service.ExpirePendingRequests();
@@ -223,15 +223,15 @@ public:
 		Check(service.OnRequest(funds), "metadata validation query queued");
 		trade::CCounterReply mismatched;
 		{
-			std::lock_guard<std::mutex> lock(service.m_mtx_pending);
-			mismatched.m_correlationId = service.m_pending.begin()->first;
+			std::lock_guard<std::mutex> lock(service.m_pending_mutex);
+			mismatched.m_correlation_id = service.m_pending.begin()->first;
 		}
-		mismatched.m_accountIndex = { 99, "other" };
+		mismatched.m_account_index = { 99, "other" };
 		mismatched.m_operation = trade::Operation::Funds;
 		completedCount = responses.size();
 		service.OnCounterReply(mismatched);
 		Check(1 == service.m_pending.size() && completedCount == responses.size(), "wrong account cannot complete pending request");
-		mismatched.m_accountIndex = account;
+		mismatched.m_account_index = account;
 		mismatched.m_operation = trade::Operation::Cancel;
 		service.OnCounterReply(mismatched);
 		Check(1 == service.m_pending.size(), "wrong operation cannot complete pending request");
@@ -257,7 +257,7 @@ public:
 		sessions.back()->Emit(account, false);
 		Check(service.OnRequest(login), "login timeout fixture queued");
 		{
-			std::lock_guard<std::mutex> lock(service.m_mtx_pending);
+			std::lock_guard<std::mutex> lock(service.m_pending_mutex);
 			service.m_pending.begin()->second.m_deadline = std::chrono::steady_clock::time_point::min();
 		}
 		service.ExpirePendingRequests();
@@ -301,7 +301,7 @@ public:
 		WriteAccountIdentity(account, request);
 		Check(service.OnRequest(request), "real timeout fixture queued");
 		{
-			std::lock_guard<std::mutex> lock(service.m_mtx_pending);
+			std::lock_guard<std::mutex> lock(service.m_pending_mutex);
 			service.m_pending.begin()->second.m_deadline = std::chrono::steady_clock::time_point::min();
 		}
 		Check(std::future_status::ready == future.wait_for(std::chrono::seconds(3)), "maintenance thread completes expired request");

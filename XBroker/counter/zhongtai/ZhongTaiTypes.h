@@ -7,17 +7,17 @@ namespace trade::zhongtai
 {
 	struct CSite
 	{
-		std::uint64_t m_brokerId{ 0 };
-		std::string m_name, m_host, m_localIp;
+		std::uint64_t m_broker_id{ 0 };
+		std::string m_name, m_host, m_local_ip;
 		int m_port{ 0 };
 	};
 	struct CConfig
 	{
 		std::vector<CSite> m_sites;
-		std::string m_softwareKey, m_softwareVersion, m_logPath;
-		unsigned int m_clientId{ 1 };
-		std::size_t m_queueLimit{ 4096 };
-		std::int64_t m_queryTimeoutMs{ 10000 }, m_queryIntervalMs{ 200 }, m_refreshMs{ 5000 };
+		std::string m_software_key, m_software_version, m_log_path;
+		unsigned int m_client_id{ 1 };
+		std::size_t m_queue_limit{ 4096 };
+		std::int64_t m_query_timeout_ms{ 10000 }, m_query_interval_ms{ 200 }, m_refresh_ms{ 5000 };
 	};
 	enum class ApiEventType
 	{
@@ -33,9 +33,9 @@ namespace trade::zhongtai
 	struct CApiEvent
 	{
 		ApiEventType m_type{ ApiEventType::Error };
-		std::uint64_t m_session{ 0 }, m_cancelOrder{ 0 };
-		int m_requestId{ 0 }, m_errorCode{ 0 };
-		bool m_last{ false }, m_hasRow{ false };
+		std::uint64_t m_session{ 0 }, m_cancel_order{ 0 };
+		int m_request_id{ 0 }, m_error_code{ 0 };
+		bool m_last{ false }, m_has_row{ false };
 		std::int64_t m_reference{ 0 };
 		CResult m_result;
 		COrder m_order;
@@ -48,7 +48,7 @@ namespace trade::zhongtai
 		CResult m_result;
 		std::uint64_t m_session{ 0 };
 		int m_day{ 0 };
-		bool m_authFailure{ false };
+		bool m_auth_failure{ false };
 	};
 	class IZhongTaiApi
 	{

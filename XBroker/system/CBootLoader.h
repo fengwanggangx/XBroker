@@ -32,14 +32,14 @@ public:
 private:
 	bool Fail(int nErrorCode, const std::string& strMessage);
 	std::filesystem::path m_exec;
-	std::string m_strLastError;
-	int m_nErrorCode{ 0 };
-	bool m_bInitialized{ false };
-	bool m_bDatabaseInitialized{ false };
-	std::unique_ptr<CTradeService> m_pTradeService;
-	std::unique_ptr<CBrokerCenter> m_pCenter;
-	std::unique_ptr<CSession> m_pMarket;
-	std::unique_ptr<net::CTcpServer> m_pTcpServer;
+	std::string m_last_error;
+	int m_error_code{ 0 };
+	bool m_initialized{ false };
+	bool m_database_initialized{ false };
+	std::unique_ptr<CTradeService> m_trade_service;
+	std::unique_ptr<CBrokerCenter> m_center;
+	std::unique_ptr<CSession> m_market;
+	std::unique_ptr<net::CTcpServer> m_tcp_server;
 };
 
 #endif

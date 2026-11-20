@@ -43,23 +43,23 @@ public:
 		m_work.emplace_back([this, request = std::move(request), handler = m_handler_reply]()
 		{
 			trade::CCountEvent event;
-			event.m_sessionId = GetId();
-			event.m_accountIndex = request.m_accountIndex;
-			event.m_requestId = request.m_requestId;
+			event.m_session_id = GetId();
+			event.m_account_index = request.m_account_index;
+			event.m_request_id = request.m_request_id;
 			event.m_kind = trade::Operation::Submit == request.GetOperation() ? trade::EventTy::Order : trade::EventTy::Session;
 			if (const trade::CSubmitParam* params = std::get_if<trade::CSubmitParam>(&request.m_param); nullptr != params)
 			{
 				event.m_order = params->m_order;
 			}
-			event.m_order.m_orderId = 123;
-			event.m_funds = { request.m_accountIndex, 10000, 0, true, true };
+			event.m_order.m_order_id = 123;
+			event.m_funds = { request.m_account_index, 10000, 0, true, true };
 			m_handler(event);
 			trade::CCounterReply reply;
-			reply.m_requestId = request.m_requestId;
-			reply.m_correlationId = request.m_correlationId;
-			reply.m_accountIndex = request.m_accountIndex;
+			reply.m_request_id = request.m_request_id;
+			reply.m_correlation_id = request.m_correlation_id;
+			reply.m_account_index = request.m_account_index;
 			reply.m_operation = request.GetOperation();
-			reply.m_data = trade::COperationReceipt{ event.m_order.m_orderId };
+			reply.m_data = trade::COperationReceipt{ event.m_order.m_order_id };
 			handler(reply);
 		});
 		return {};
@@ -117,7 +117,7 @@ int main()
 	int nReplies = 0;
 	gateway->SetEventHandler([&nEvents](const trade::CCountEvent& event)
 	{
-		if (TestAccount(7) == event.m_accountIndex)
+		if (TestAccount(7) == event.m_account_index)
 		{
 			++nEvents;
 		}
@@ -125,7 +125,7 @@ int main()
 	for (trade::Operation operation : { trade::Operation::Login, trade::Operation::Submit })
 	{
 		trade::CReqParam request;
-		request.m_accountIndex = TestAccount(7);
+		request.m_account_index = TestAccount(7);
 		request.m_param = MakeParams(operation);
 		if (!countertest::SendRequest(*gateway, std::move(request), [&nReplies](const trade::CCounterReply& reply)
 		{

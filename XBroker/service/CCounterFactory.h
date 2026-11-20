@@ -43,7 +43,7 @@ namespace trade
 
 		std::shared_ptr<ITradeSession> Create(const CCounterConfig& config) const
 		{
-			const auto mIter = m_factory.find(config.m_strAdapter);
+			const auto mIter = m_factory.find(config.m_adapter);
 			return m_factory.end() == mIter ? nullptr : mIter->second(config);
 		}
 

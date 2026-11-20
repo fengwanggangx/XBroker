@@ -43,11 +43,11 @@ private:
 	bool OnReply(net::_TyConnectionId id, const CRequest& req);
 	bool ChangeDepthSubscription(const std::string& security, bool subscribe);
 
-	CTradeService* m_pTradeService{ nullptr };
+	CTradeService* m_trade_service{ nullptr };
 	_TyRequestNotify m_handler_market;
-	std::unordered_map<std::string, std::chrono::steady_clock::time_point> m_clientTokens;
-	std::string m_strLastError;
-	std::mutex m_mtx_clients;
+	std::unordered_map<std::string, std::chrono::steady_clock::time_point> m_client_tokens;
+	std::string m_last_error;
+	std::mutex m_clients_mutex;
 	std::unordered_set<net::_TyConnectionId> m_clients;
-	bool m_bInitialized{ false };
+	bool m_initialized{ false };
 };

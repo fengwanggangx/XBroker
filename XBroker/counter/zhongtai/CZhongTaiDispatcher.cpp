@@ -49,21 +49,21 @@ void CZhongTaiDispatcher::Start()
 	}
 	m_api->SetHandler(std::bind_front(&CZhongTaiDispatcher::Receive, this));
 	m_worker = std::thread(std::bind_front(&CZhongTaiDispatcher::Run, this));
-	m_workerId = m_worker.get_id();
+	m_worker_id = m_worker.get_id();
 }
 
 void CZhongTaiDispatcher::Stop()
 {
 	{
-		std::lock_guard<std::mutex> lock(m_mtx_queue);
+		std::lock_guard<std::mutex> lock(m_queue_mutex);
 		m_stopping = true;
 	}
 	m_condition.notify_all();
-	if (m_workerId == std::this_thread::get_id())
+	if (m_worker_id == std::this_thread::get_id())
 	{
 		return;
 	}
-	std::lock_guard<std::mutex> stopLock(m_mtx_stop);
+	std::lock_guard<std::mutex> stopLock(m_stop_mutex);
 	if (m_worker.joinable())
 	{
 		m_worker.join();
@@ -74,7 +74,7 @@ void CZhongTaiDispatcher::Stop()
 	}
 	std::vector<std::shared_ptr<CZhongTaiSession>> sessions;
 	{
-		std::lock_guard<std::mutex> lock(m_mtx_counters);
+		std::lock_guard<std::mutex> lock(m_counters_mutex);
 		for (const auto& item : m_counters)
 		{
 			std::shared_ptr<CZhongTaiSession> session = item.second.lock();
@@ -94,24 +94,24 @@ void CZhongTaiDispatcher::Stop()
 
 std::shared_ptr<ITradeSession> CZhongTaiDispatcher::Create(const CCounterConfig& config)
 {
-	std::lock_guard<std::mutex> stopLock(m_mtx_stop);
+	std::lock_guard<std::mutex> stopLock(m_stop_mutex);
 	{
-		std::lock_guard<std::mutex> lock(m_mtx_queue);
+		std::lock_guard<std::mutex> lock(m_queue_mutex);
 		if (m_stopping)
 		{
 			return nullptr;
 		}
 	}
-	std::unique_lock<std::mutex> lock(m_mtx_counters);
-	std::shared_ptr<CZhongTaiSession> counter = std::make_shared<CZhongTaiSession>(this, config.m_accountIndex, ++m_nextInstance);
+	std::unique_lock<std::mutex> lock(m_counters_mutex);
+	std::shared_ptr<CZhongTaiSession> counter = std::make_shared<CZhongTaiSession>(this, config.m_account_index, ++m_next_instance);
 	std::shared_ptr<CZhongTaiSession> retired;
-	const auto previous = m_counters.find(config.m_accountIndex);
+	const auto previous = m_counters.find(config.m_account_index);
 	if (m_counters.end() != previous)
 	{
 		retired = previous->second.lock();
 	}
-	m_counters.insert_or_assign(config.m_accountIndex, counter);
-	m_instances.insert_or_assign(config.m_accountIndex, m_nextInstance);
+	m_counters.insert_or_assign(config.m_account_index, counter);
+	m_instances.insert_or_assign(config.m_account_index, m_next_instance);
 	lock.unlock();
 	if (nullptr != retired)
 	{
@@ -122,19 +122,19 @@ std::shared_ptr<ITradeSession> CZhongTaiDispatcher::Create(const CCounterConfig&
 
 bool CZhongTaiDispatcher::IsCurrent(const _TyAccount& account, std::uint64_t instance)
 {
-	std::lock_guard<std::mutex> lock(m_mtx_counters);
+	std::lock_guard<std::mutex> lock(m_counters_mutex);
 	const auto mIter = m_instances.find(account);
 	return m_instances.end() != mIter && instance == mIter->second;
 }
 
 CResult CZhongTaiDispatcher::Send(CReqParam request, ITradeSession::_TyReplyHandler handler, std::uint64_t instance)
 {
-	if (!IsCurrent(request.m_accountIndex, instance))
+	if (!IsCurrent(request.m_account_index, instance))
 	{
 		return { Error::Unavailable, "retired account session" };
 	}
-	std::lock_guard<std::mutex> lock(m_mtx_queue);
-	if (m_stopping || m_config.m_queueLimit <= m_queue.size())
+	std::lock_guard<std::mutex> lock(m_queue_mutex);
+	if (m_stopping || m_config.m_queue_limit <= m_queue.size())
 	{
 		return { Error::Unavailable, "XTP gateway stopped or request queue full" };
 	}
@@ -156,12 +156,12 @@ CResult CZhongTaiDispatcher::Send(CReqParam request, ITradeSession::_TyReplyHand
 
 void CZhongTaiDispatcher::Receive(CApiEvent event)
 {
-	std::lock_guard<std::mutex> lock(m_mtx_queue);
+	std::lock_guard<std::mutex> lock(m_queue_mutex);
 	if (m_stopping)
 	{
 		return;
 	}
-	if (m_config.m_queueLimit <= m_queue.size())
+	if (m_config.m_queue_limit <= m_queue.size())
 	{
 		m_overflow = true;
 	}
@@ -178,22 +178,22 @@ void CZhongTaiDispatcher::Snapshot(CSession& session)
 	session.m_snapshot.m_trades.clear();
 	for (const auto& item : session.m_orders)
 	{
-		if (session.m_journal.trading_day() == item.second.m_nDay)
+		if (session.m_journal.trading_day() == item.second.m_day)
 		{
 			session.m_snapshot.m_orders.emplace_back(item.second);
 		}
 	}
 	for (const auto& item : session.m_trades)
 	{
-		if (session.m_journal.trading_day() == item.second.m_nDay)
+		if (session.m_journal.trading_day() == item.second.m_day)
 		{
 			session.m_snapshot.m_trades.emplace_back(item.second);
 		}
 	}
-	session.m_snapshot.m_bReady = session.m_ready;
+	session.m_snapshot.m_ready = session.m_ready;
 	session.m_snapshot.m_version = session.m_journal.sequence();
-	session.m_snapshot.m_nTime = Now();
-	session.m_snapshot.m_account.m_accountIndex = session.m_account;
+	session.m_snapshot.m_time = Now();
+	session.m_snapshot.m_account.m_account_index = session.m_account;
 	std::shared_ptr<CZhongTaiSession> counter = session.m_counter.lock();
 	if (nullptr != counter)
 	{
@@ -218,12 +218,12 @@ bool CZhongTaiDispatcher::Persist(CSession& session)
 	{
 		session.m_disabled = true;
 		session.m_ready = false;
-		session.m_snapshot.m_account.m_bFundsValid = false;
-		session.m_snapshot.m_account.m_bConnected = false;
-		session.m_snapshot.m_account.m_nState = 2;
+		session.m_snapshot.m_account.m_funds_valid = false;
+		session.m_snapshot.m_account.m_connected = false;
+		session.m_snapshot.m_account.m_state = 2;
 		Snapshot(session);
 		CCountEvent invalid;
-		invalid.m_accountIndex = session.m_account;
+		invalid.m_account_index = session.m_account;
 		invalid.m_kind = EventTy::Session;
 		invalid.m_funds = session.m_snapshot.m_account;
 		invalid.m_sequence = 0;
@@ -239,9 +239,9 @@ bool CZhongTaiDispatcher::Persist(CSession& session)
 
 void CZhongTaiDispatcher::Publish(CSession& session, CCountEvent event)
 {
-	event.m_accountIndex = session.m_account;
+	event.m_account_index = session.m_account;
 	event.m_funds = session.m_snapshot.m_account;
-	event.m_bAccountValid = true;
+	event.m_account_valid = true;
 	event.m_sequence = session.m_journal.sequence() + 1;
 	session.m_journal.set_sequence(event.m_sequence);
 	protocol::WriteEvent(event, *session.m_journal.add_events());
@@ -252,7 +252,7 @@ void CZhongTaiDispatcher::Publish(CSession& session, CCountEvent event)
 	Snapshot(session);
 	if (!session.m_published)
 	{
-		session.m_initialEvents.emplace_back(std::move(event));
+		session.m_initial_events.emplace_back(std::move(event));
 		return;
 	}
 	std::shared_ptr<CZhongTaiSession> counter = session.m_counter.lock();
@@ -265,13 +265,13 @@ void CZhongTaiDispatcher::Publish(CSession& session, CCountEvent event)
 void CZhongTaiDispatcher::Reply(CSession& session, CWork& work, const CResult& result, std::uint64_t orderId)
 {
 	CCounterReply reply;
-	reply.m_accountIndex = session.m_account;
-	reply.m_requestId = work.m_request.m_requestId;
-	reply.m_correlationId = work.m_request.m_correlationId;
+	reply.m_account_index = session.m_account;
+	reply.m_request_id = work.m_request.m_request_id;
+	reply.m_correlation_id = work.m_request.m_correlation_id;
 	reply.m_operation = work.m_request.GetOperation();
 	reply.m_result = result;
 	reply.m_version = session.m_journal.sequence();
-	reply.m_nTime = Now();
+	reply.m_time = Now();
 	switch (reply.m_operation)
 	{
 	case Operation::Funds:
@@ -305,9 +305,9 @@ void CZhongTaiDispatcher::Fail(CSession& session, const CResult& result, bool di
 	{
 		session.m_password.clear();
 	}
-	session.m_snapshot.m_account.m_bConnected = false;
-	session.m_snapshot.m_account.m_bFundsValid = false;
-	session.m_snapshot.m_account.m_nState = session.m_disabled ? 2 : 5;
+	session.m_snapshot.m_account.m_connected = false;
+	session.m_snapshot.m_account.m_funds_valid = false;
+	session.m_snapshot.m_account.m_state = session.m_disabled ? 2 : 5;
 	if (m_query.has_value() && m_query->m_account == session.m_account)
 	{
 		if (m_query->m_work.has_value())
@@ -332,9 +332,9 @@ void CZhongTaiDispatcher::Fail(CSession& session, const CResult& result, bool di
 		session.m_login.reset();
 	}
 	session.m_buffer.clear();
-	session.m_initialEvents.clear();
+	session.m_initial_events.clear();
 	int delays[]{ 1, 2, 4, 8, 16, 30 };
-	session.m_retryAt = Now() + 1000 * delays[std::min(session.m_attempt++, 5)];
+	session.m_retry_at = Now() + 1000 * delays[std::min(session.m_attempt++, 5)];
 	Snapshot(session);
 	if (session.m_published)
 	{
@@ -347,7 +347,7 @@ void CZhongTaiDispatcher::Fail(CSession& session, const CResult& result, bool di
 		catch (...)
 		{
 			event.m_funds = session.m_snapshot.m_account;
-			event.m_accountIndex = session.m_account;
+			event.m_account_index = session.m_account;
 			event.m_sequence = 0;
 			std::shared_ptr<CZhongTaiSession> counter = session.m_counter.lock();
 			if (nullptr != counter)
@@ -366,7 +366,7 @@ void CZhongTaiDispatcher::Login(CSession& session)
 {
 	const auto vIter = std::find_if(m_config.m_sites.begin(), m_config.m_sites.end(), [&session](const CSite& site)
 	{
-		return session.m_account.first == site.m_brokerId && session.m_site == site.m_name;
+		return session.m_account.first == site.m_broker_id && session.m_site == site.m_name;
 	});
 	if (m_config.m_sites.end() == vIter)
 	{
@@ -384,21 +384,21 @@ void CZhongTaiDispatcher::Login(CSession& session)
 	for (const auto& row : session.m_journal.orders())
 	{
 		COrder order = ReadOrder(row);
-		session.m_orders.emplace(order.m_orderId, std::move(order));
+		session.m_orders.emplace(order.m_order_id, std::move(order));
 	}
 	for (const auto& row : session.m_journal.trades())
 	{
 		CTrade trade = ReadTrade(row);
 		session.m_trades.emplace(TradeKey(trade), std::move(trade));
 	}
-	session.m_leaseAt = Now() + 5000;
+	session.m_lease_at = Now() + 5000;
 	CLoginReply login = m_api->Login(*vIter, session.m_account.second, session.m_password);
 	if (!login.m_result.Ok() || 0 == login.m_session)
 	{
-		Fail(session, login.m_result.Ok() ? CResult{ Error::Unavailable, "zero XTP session" } : login.m_result, login.m_authFailure);
+		Fail(session, login.m_result.Ok() ? CResult{ Error::Unavailable, "zero XTP session" } : login.m_result, login.m_auth_failure);
 		return;
 	}
-	if (!m_usedSessions.emplace(login.m_session).second)
+	if (!m_used_sessions.emplace(login.m_session).second)
 	{
 		m_api->Logout(login.m_session);
 		Fail(session, { Error::Unavailable, "SDK reused session ID; restart required" }, true);
@@ -408,12 +408,12 @@ void CZhongTaiDispatcher::Login(CSession& session)
 	++session.m_generation;
 	session.m_journal.set_trading_day(login.m_day);
 	session.m_ready = false;
-	session.m_syncStep = 0;
+	session.m_sync_step = 0;
 	session.m_refresh = false;
 	session.m_buffer.clear();
-	session.m_snapshot.m_account.m_nState = 4;
-	session.m_snapshot.m_account.m_bConnected = false;
-	session.m_snapshot.m_account.m_bFundsValid = false;
+	session.m_snapshot.m_account.m_state = 4;
+	session.m_snapshot.m_account.m_connected = false;
+	session.m_snapshot.m_account.m_funds_valid = false;
 	Snapshot(session);
 	if (session.m_published)
 	{
@@ -425,15 +425,15 @@ void CZhongTaiDispatcher::Login(CSession& session)
 
 void CZhongTaiDispatcher::Handle(CWork work)
 {
-	const _TyAccount& account = work.m_request.m_accountIndex;
+	const _TyAccount& account = work.m_request.m_account_index;
 	const auto mIter = m_sessions.find(account);
 	Operation operation = work.m_request.GetOperation();
 	if (!IsCurrent(account, work.m_instance))
 	{
 		CCounterReply reply;
-		reply.m_accountIndex = account;
-		reply.m_requestId = work.m_request.m_requestId;
-		reply.m_correlationId = work.m_request.m_correlationId;
+		reply.m_account_index = account;
+		reply.m_request_id = work.m_request.m_request_id;
+		reply.m_correlation_id = work.m_request.m_correlation_id;
 		reply.m_operation = operation;
 		reply.m_result = { Error::Unavailable, "retired account session" };
 		Invoke(work.m_handler, reply);
@@ -450,7 +450,7 @@ void CZhongTaiDispatcher::Handle(CWork work)
 		session.m_account = account;
 		session.m_instance = work.m_instance;
 		{
-			std::lock_guard<std::mutex> lock(m_mtx_counters);
+			std::lock_guard<std::mutex> lock(m_counters_mutex);
 			const auto counter = m_counters.find(account);
 			if (m_counters.end() != counter)
 			{
@@ -459,9 +459,9 @@ void CZhongTaiDispatcher::Handle(CWork work)
 		}
 		const CLoginParam& parameters = std::get<CLoginParam>(work.m_request.m_param);
 		session.m_published = false;
-		session.m_initialEvents.clear();
-		session.m_site = parameters.m_strSite;
-		session.m_password = parameters.m_strPassword;
+		session.m_initial_events.clear();
+		session.m_site = parameters.m_site;
+		session.m_password = parameters.m_password;
 		session.m_disabled = false;
 		session.m_login = std::move(work);
 		CResult loaded = m_store->Load(account, session.m_journal);
@@ -475,7 +475,7 @@ void CZhongTaiDispatcher::Handle(CWork work)
 		for (const auto& row : session.m_journal.orders())
 		{
 			COrder order = ReadOrder(row);
-			session.m_orders.emplace(order.m_orderId, std::move(order));
+			session.m_orders.emplace(order.m_order_id, std::move(order));
 		}
 		for (const auto& row : session.m_journal.trades())
 		{
@@ -488,9 +488,9 @@ void CZhongTaiDispatcher::Handle(CWork work)
 	if (m_sessions.end() == mIter)
 	{
 		CCounterReply reply;
-		reply.m_accountIndex = account;
-		reply.m_requestId = work.m_request.m_requestId;
-		reply.m_correlationId = work.m_request.m_correlationId;
+		reply.m_account_index = account;
+		reply.m_request_id = work.m_request.m_request_id;
+		reply.m_correlation_id = work.m_request.m_correlation_id;
 		reply.m_operation = operation;
 		reply.m_result = { Error::NotFound, "XTP account not logged in" };
 		Invoke(work.m_handler, reply);
@@ -506,7 +506,7 @@ void CZhongTaiDispatcher::Handle(CWork work)
 	{
 		Fail(session, { Error::Unavailable, "account disconnected" }, true);
 		session.m_password.clear();
-		session.m_snapshot.m_account.m_nState = 0;
+		session.m_snapshot.m_account.m_state = 0;
 		session.m_disabled = true;
 		Reply(session, work, {});
 		m_store->Release(account);
@@ -521,27 +521,27 @@ void CZhongTaiDispatcher::Handle(CWork work)
 	{
 
 		COrder order = std::get<CSubmitParam>(work.m_request.m_param).m_order;
-		order.m_accountIndex = account;
-		order.m_requestId = work.m_request.m_requestId;
-		order.m_nDay = session.m_journal.trading_day();
-		if (!IsStock(order.m_strSecurity) || 0 == order.m_clientId || 0 >= order.m_nPrice || 0 >= order.m_nQuantity || 0 > order.m_nPriceScale || 4 < order.m_nPriceScale || (Side::Buy != order.m_side && Side::Sell != order.m_side))
+		order.m_account_index = account;
+		order.m_request_id = work.m_request.m_request_id;
+		order.m_day = session.m_journal.trading_day();
+		if (!IsStock(order.m_security) || 0 == order.m_client_id || 0 >= order.m_price || 0 >= order.m_quantity || 0 > order.m_price_scale || 4 < order.m_price_scale || (Side::Buy != order.m_side && Side::Sell != order.m_side))
 		{
 			Reply(session, work, { Error::Rejected, "only valid Shanghai/Shenzhen cash stock limit orders supported" });
 			return;
 		}
-		while (4 > order.m_nPriceScale)
+		while (4 > order.m_price_scale)
 		{
-			if (std::numeric_limits<std::int64_t>::max() / 10 < order.m_nPrice)
+			if (std::numeric_limits<std::int64_t>::max() / 10 < order.m_price)
 			{
 				Reply(session, work, { Error::Rejected, "price overflow" });
 				return;
 			}
-			order.m_nPrice *= 10;
-			++order.m_nPriceScale;
+			order.m_price *= 10;
+			++order.m_price_scale;
 		}
 		for (const auto& item : session.m_orders)
 		{
-			if (order.m_nDay == item.second.m_nDay && order.m_clientId == item.second.m_clientId)
+			if (order.m_day == item.second.m_day && order.m_client_id == item.second.m_client_id)
 			{
 				CResult result = SameOrder(order, item.second) ? CResult{} : CResult{ Error::Conflict, "client order ID reused" };
 				if (result.Ok() && (Status::Unknown == item.second.m_status || Status::Pending == item.second.m_status))
@@ -552,23 +552,23 @@ void CZhongTaiDispatcher::Handle(CWork work)
 				return;
 			}
 		}
-		if (!session.m_snapshot.m_account.m_bFundsValid)
+		if (!session.m_snapshot.m_account.m_funds_valid)
 		{
 			Reply(session, work, { Error::Unavailable, "funds snapshot invalid" });
 			return;
 		}
-		order.m_orderId = session.m_journal.next_order() + 1;
-		session.m_journal.set_next_order(order.m_orderId);
-		if (std::numeric_limits<std::uint32_t>::max() < order.m_orderId)
+		order.m_order_id = session.m_journal.next_order() + 1;
+		session.m_journal.set_next_order(order.m_order_id);
+		if (std::numeric_limits<std::uint32_t>::max() < order.m_order_id)
 		{
 			Reply(session, work, { Error::Unavailable, "XTP client reference exhausted" });
 			return;
 		}
-		order.m_sdkClientId = static_cast<std::uint32_t>(order.m_orderId);
+		order.m_sdk_client_id = static_cast<std::uint32_t>(order.m_order_id);
 		order.m_status = Status::Unknown;
-		order.m_bFeeKnown = false;
-		order.m_bFrozenKnown = false;
-		session.m_orders.emplace(order.m_orderId, order);
+		order.m_fee_known = false;
+		order.m_frozen_known = false;
+		session.m_orders.emplace(order.m_order_id, order);
 		if (!Persist(session))
 		{
 			Reply(session, work, { Error::Unavailable, "cannot persist send intent" });
@@ -583,46 +583,46 @@ void CZhongTaiDispatcher::Handle(CWork work)
 		}
 		catch (...)
 		{
-			Reply(session, work, { Error::UnknownResult, "XTP submit outcome unknown" }, order.m_orderId);
+			Reply(session, work, { Error::UnknownResult, "XTP submit outcome unknown" }, order.m_order_id);
 			Fail(session, { Error::UnknownResult, "reconcile uncertain submit" });
 			return;
 		}
-		COrder& stored = session.m_orders.at(order.m_orderId);
-		session.m_snapshot.m_account.m_bFundsValid = false;
-		session.m_dirtyFinancials = true;
-		session.m_refreshAt = 0;
+		COrder& stored = session.m_orders.at(order.m_order_id);
+		session.m_snapshot.m_account.m_funds_valid = false;
+		session.m_dirty_financials = true;
+		session.m_refresh_at = 0;
 		if (!result.Ok() || 0 == brokerId)
 		{
 			stored.m_status = Status::Rejected;
-			stored.m_strError = result.m_strMessage;
+			stored.m_error_message = result.m_message;
 		}
 		else
 		{
-			stored.m_strBrokerOrderId = std::to_string(brokerId);
+			stored.m_broker_order_id = std::to_string(brokerId);
 			stored.m_status = Status::Pending;
 		}
 		CCountEvent event;
 		event.m_kind = EventTy::Order;
 		event.m_order = stored;
-		event.m_requestId = order.m_requestId;
+		event.m_request_id = order.m_request_id;
 		try
 		{
 			Publish(session, std::move(event));
 		}
 		catch (...)
 		{
-			Reply(session, work, { Error::UnknownResult, "order sent but journal update failed" }, order.m_orderId);
+			Reply(session, work, { Error::UnknownResult, "order sent but journal update failed" }, order.m_order_id);
 			Fail(session, { Error::Unavailable, "storage failure" }, true);
 			return;
 		}
-		Reply(session, work, result, order.m_orderId);
+		Reply(session, work, result, order.m_order_id);
 		return;
 	}
 	if (Operation::Cancel == operation)
 	{
-		std::uint64_t id = std::get<CCancelParam>(work.m_request.m_param).m_orderId;
+		std::uint64_t id = std::get<CCancelParam>(work.m_request.m_param).m_order_id;
 		const auto order = session.m_orders.find(id);
-		if (session.m_orders.end() == order || session.m_journal.trading_day() != order->second.m_nDay)
+		if (session.m_orders.end() == order || session.m_journal.trading_day() != order->second.m_day)
 		{
 			Reply(session, work, { Error::NotFound, "order not found for current trading day" });
 			return;
@@ -632,17 +632,17 @@ void CZhongTaiDispatcher::Handle(CWork work)
 			Reply(session, work, {}, id);
 			return;
 		}
-		if (order->second.m_strBrokerOrderId.empty())
+		if (order->second.m_broker_order_id.empty())
 		{
 			Reply(session, work, { Error::UnknownResult, "broker order ID not confirmed" }, id);
 			return;
 		}
-		if (order->second.m_bCancelPending)
+		if (order->second.m_cancel_pending)
 		{
 			Reply(session, work, {}, id);
 			return;
 		}
-		order->second.m_bCancelPending = true;
+		order->second.m_cancel_pending = true;
 		if (!Persist(session))
 		{
 			Reply(session, work, { Error::Unavailable, "cannot persist cancel intent" }, id);
@@ -652,7 +652,7 @@ void CZhongTaiDispatcher::Handle(CWork work)
 		CResult result;
 		try
 		{
-			result = m_api->Cancel(session.m_session, std::stoull(order->second.m_strBrokerOrderId));
+			result = m_api->Cancel(session.m_session, std::stoull(order->second.m_broker_order_id));
 		}
 		catch (...)
 		{
@@ -662,12 +662,12 @@ void CZhongTaiDispatcher::Handle(CWork work)
 		}
 		if (!result.Ok())
 		{
-			order->second.m_bCancelPending = false;
+			order->second.m_cancel_pending = false;
 		}
 		CCountEvent event;
 		event.m_kind = EventTy::Order;
 		event.m_order = order->second;
-		event.m_requestId = work.m_request.m_requestId;
+		event.m_request_id = work.m_request.m_request_id;
 		Publish(session, std::move(event));
 		Reply(session, work, result, id);
 		return;
@@ -677,7 +677,7 @@ void CZhongTaiDispatcher::Handle(CWork work)
 		Reply(session, work, {});
 		return;
 	}
-	if (session.m_queries.size() >= m_config.m_queueLimit)
+	if (session.m_queries.size() >= m_config.m_queue_limit)
 	{
 		Reply(session, work, { Error::Unavailable, "query queue full" });
 		return;
@@ -687,7 +687,7 @@ void CZhongTaiDispatcher::Handle(CWork work)
 
 void CZhongTaiDispatcher::Apply(CSession& session, const CApiEvent& event)
 {
-	if (!event.m_hasRow)
+	if (!event.m_has_row)
 	{
 		return;
 	}
@@ -695,19 +695,19 @@ void CZhongTaiDispatcher::Apply(CSession& session, const CApiEvent& event)
 	if (ApiEventType::Order == event.m_type)
 	{
 		COrder order = event.m_order;
-		if (0 == order.m_nDay)
+		if (0 == order.m_day)
 		{
-			order.m_nDay = session.m_journal.trading_day();
+			order.m_day = session.m_journal.trading_day();
 		}
-		order.m_accountIndex = session.m_account;
+		order.m_account_index = session.m_account;
 		const auto mIter = std::find_if(session.m_orders.begin(), session.m_orders.end(), [&](const auto& item)
 		{
-			return order.m_nDay == item.second.m_nDay && (order.m_strBrokerOrderId == item.second.m_strBrokerOrderId || (0 != order.m_sdkClientId && order.m_sdkClientId == item.second.m_sdkClientId));
+			return order.m_day == item.second.m_day && (order.m_broker_order_id == item.second.m_broker_order_id || (0 != order.m_sdk_client_id && order.m_sdk_client_id == item.second.m_sdk_client_id));
 		});
 		if (session.m_orders.end() != mIter)
 		{
 			COrder& previous = mIter->second;
-			if (previous.m_nBrokerTime > order.m_nBrokerTime)
+			if (previous.m_broker_time > order.m_broker_time)
 			{
 				return;
 			}
@@ -715,16 +715,16 @@ void CZhongTaiDispatcher::Apply(CSession& session, const CApiEvent& event)
 			{
 				return;
 			}
-			order.m_orderId = previous.m_orderId;
-			order.m_clientId = previous.m_clientId;
-			order.m_requestId = previous.m_requestId;
-			order.m_strategyId = previous.m_strategyId;
-			order.m_signalId = previous.m_signalId;
-			order.m_nFilled = std::max(order.m_nFilled, previous.m_nFilled);
-			order.m_bCancelPending = !Terminal(order.m_status) && previous.m_bCancelPending;
-			if (!Terminal(order.m_status) && 0 < order.m_nFilled)
+			order.m_order_id = previous.m_order_id;
+			order.m_client_id = previous.m_client_id;
+			order.m_request_id = previous.m_request_id;
+			order.m_strategy_id = previous.m_strategy_id;
+			order.m_signal_id = previous.m_signal_id;
+			order.m_filled = std::max(order.m_filled, previous.m_filled);
+			order.m_cancel_pending = !Terminal(order.m_status) && previous.m_cancel_pending;
+			if (!Terminal(order.m_status) && 0 < order.m_filled)
 			{
-				order.m_status = order.m_nFilled >= order.m_nQuantity ? Status::Filled : Status::PartiallyFilled;
+				order.m_status = order.m_filled >= order.m_quantity ? Status::Filled : Status::PartiallyFilled;
 			}
 			request::TradeOrderRecord oldWire, newWire;
 			protocol::WriteOrder(previous, oldWire);
@@ -736,27 +736,27 @@ void CZhongTaiDispatcher::Apply(CSession& session, const CApiEvent& event)
 		}
 		else
 		{
-			order.m_orderId = session.m_journal.next_order() + 1;
-			session.m_journal.set_next_order(order.m_orderId);
+			order.m_order_id = session.m_journal.next_order() + 1;
+			session.m_journal.set_next_order(order.m_order_id);
 		}
-		if (0 == event.m_requestId && (ApiEventType::Order == event.m_type || ApiEventType::Trade == event.m_type))
+		if (0 == event.m_request_id && (ApiEventType::Order == event.m_type || ApiEventType::Trade == event.m_type))
 		{
-			session.m_snapshot.m_account.m_bFundsValid = false;
-			session.m_dirtyFinancials = true;
+			session.m_snapshot.m_account.m_funds_valid = false;
+			session.m_dirty_financials = true;
 		}
 
-		session.m_orders.insert_or_assign(order.m_orderId, order);
+		session.m_orders.insert_or_assign(order.m_order_id, order);
 		CCountEvent output;
 		output.m_kind = EventTy::Order;
 		output.m_order = order;
-		output.m_requestId = order.m_requestId;
+		output.m_request_id = order.m_request_id;
 		Publish(session, std::move(output));
-		session.m_refreshAt = 0;
+		session.m_refresh_at = 0;
 	}
 	else if (ApiEventType::Trade == event.m_type)
 	{
 		CTrade trade = event.m_trade;
-		trade.m_accountIndex = session.m_account;
+		trade.m_account_index = session.m_account;
 		std::string key = TradeKey(trade);
 		if (container::with(session.m_trades, key))
 		{
@@ -764,27 +764,27 @@ void CZhongTaiDispatcher::Apply(CSession& session, const CApiEvent& event)
 		}
 		const auto mIter = std::find_if(session.m_orders.begin(), session.m_orders.end(), [&](const auto& item)
 		{
-			return trade.m_nDay == item.second.m_nDay && trade.m_strBrokerOrderId == item.second.m_strBrokerOrderId;
+			return trade.m_day == item.second.m_day && trade.m_broker_order_id == item.second.m_broker_order_id;
 		});
 		if (session.m_orders.end() == mIter)
 		{
-			if (session.m_buffer.size() >= m_config.m_queueLimit)
+			if (session.m_buffer.size() >= m_config.m_queue_limit)
 			{
 				throw std::runtime_error("unmatched trade buffer overflow");
 			}
 			session.m_buffer.emplace_back(event);
-			session.m_refreshAt = 0;
+			session.m_refresh_at = 0;
 			return;
 		}
-		if (0 == event.m_requestId && (ApiEventType::Order == event.m_type || ApiEventType::Trade == event.m_type))
+		if (0 == event.m_request_id && (ApiEventType::Order == event.m_type || ApiEventType::Trade == event.m_type))
 		{
-			session.m_snapshot.m_account.m_bFundsValid = false;
-			session.m_dirtyFinancials = true;
+			session.m_snapshot.m_account.m_funds_valid = false;
+			session.m_dirty_financials = true;
 		}
 
-		trade.m_orderId = mIter->first;
-		trade.m_tradeId = session.m_journal.next_trade() + 1;
-		session.m_journal.set_next_trade(trade.m_tradeId);
+		trade.m_order_id = mIter->first;
+		trade.m_trade_id = session.m_journal.next_trade() + 1;
+		session.m_journal.set_next_trade(trade.m_trade_id);
 		session.m_trades.emplace(key, trade);
 		CCountEvent output;
 		output.m_kind = EventTy::Deal;
@@ -794,33 +794,33 @@ void CZhongTaiDispatcher::Apply(CSession& session, const CApiEvent& event)
 		std::int64_t filled = 0;
 		for (const auto& item : session.m_trades)
 		{
-			if (item.second.m_orderId == order.m_orderId)
+			if (item.second.m_order_id == order.m_order_id)
 			{
-				filled += item.second.m_nQuantity;
+				filled += item.second.m_quantity;
 			}
 		}
-		order.m_nFilled = std::max(order.m_nFilled, filled);
+		order.m_filled = std::max(order.m_filled, filled);
 		if (!Terminal(order.m_status))
 		{
-			order.m_status = order.m_nFilled >= order.m_nQuantity ? Status::Filled : Status::PartiallyFilled;
+			order.m_status = order.m_filled >= order.m_quantity ? Status::Filled : Status::PartiallyFilled;
 		}
 		if (Terminal(order.m_status))
 		{
-			order.m_bCancelPending = false;
+			order.m_cancel_pending = false;
 		}
 		CCountEvent change;
 		change.m_kind = EventTy::Order;
 		change.m_order = order;
 		Publish(session, std::move(change));
-		session.m_refreshAt = 0;
+		session.m_refresh_at = 0;
 	}
 	else if (ApiEventType::Funds == event.m_type)
 	{
-		session.m_dirtyFinancials = false;
+		session.m_dirty_financials = false;
 		session.m_snapshot.m_account = event.m_funds;
-		session.m_snapshot.m_account.m_accountIndex = session.m_account;
-		session.m_snapshot.m_account.m_bConnected = session.m_ready;
-		session.m_snapshot.m_account.m_nState = session.m_ready ? 1 : 4;
+		session.m_snapshot.m_account.m_account_index = session.m_account;
+		session.m_snapshot.m_account.m_connected = session.m_ready;
+		session.m_snapshot.m_account.m_state = session.m_ready ? 1 : 4;
 		CCountEvent output;
 		output.m_kind = EventTy::Funds;
 		Publish(session, std::move(output));
@@ -829,7 +829,7 @@ void CZhongTaiDispatcher::Apply(CSession& session, const CApiEvent& event)
 
 void CZhongTaiDispatcher::Query(CSession& session, Operation operation, bool sync, std::optional<CWork> work)
 {
-	if (std::numeric_limits<int>::max() == m_nextQuery)
+	if (std::numeric_limits<int>::max() == m_next_query)
 	{
 		if (work.has_value())
 		{
@@ -843,13 +843,13 @@ void CZhongTaiDispatcher::Query(CSession& session, Operation operation, bool syn
 	query.m_session = session.m_session;
 	query.m_generation = session.m_generation;
 	query.m_operation = operation;
-	query.m_id = m_nextQuery++;
+	query.m_id = m_next_query++;
 	query.m_sync = sync;
-	query.m_deadline = Now() + m_config.m_queryTimeoutMs;
+	query.m_deadline = Now() + m_config.m_query_timeout_ms;
 	query.m_work = std::move(work);
 	m_query = std::move(query);
 	CResult result = m_api->Query(session.m_session, operation, m_query->m_id, 0);
-	m_nextQueryAt = Now() + m_config.m_queryIntervalMs;
+	m_next_query_at = Now() + m_config.m_query_interval_ms;
 	if (!result.Ok())
 	{
 		Fail(session, result);
@@ -879,7 +879,7 @@ void CZhongTaiDispatcher::FinishQuery()
 			for (const auto& event : query.m_data)
 			{
 				CPosition position = event.m_position;
-				position.m_accountIndex = session.m_account;
+				position.m_account_index = session.m_account;
 				session.m_snapshot.m_positions.emplace_back(std::move(position));
 			}
 			for (const auto& position : session.m_snapshot.m_positions)
@@ -903,15 +903,15 @@ void CZhongTaiDispatcher::FinishQuery()
 			std::set<std::string> observed;
 			for (const auto& row : query.m_data)
 			{
-				observed.emplace(row.m_order.m_strBrokerOrderId);
+				observed.emplace(row.m_order.m_broker_order_id);
 			}
 			for (auto& item : session.m_orders)
 			{
 				COrder& order = item.second;
-				if (session.m_journal.trading_day() == order.m_nDay && !Terminal(order.m_status) && Status::Unknown != order.m_status && !order.m_strBrokerOrderId.empty() && observed.end() == observed.find(order.m_strBrokerOrderId))
+				if (session.m_journal.trading_day() == order.m_day && !Terminal(order.m_status) && Status::Unknown != order.m_status && !order.m_broker_order_id.empty() && observed.end() == observed.find(order.m_broker_order_id))
 				{
 					order.m_status = Status::Unknown;
-					order.m_strError = "order absent from completed broker query; outcome uncertain";
+					order.m_error_message = "order absent from completed broker query; outcome uncertain";
 					CCountEvent event;
 					event.m_kind = EventTy::Order;
 					event.m_order = order;
@@ -928,12 +928,12 @@ void CZhongTaiDispatcher::FinishQuery()
 		}
 		if (query.m_sync)
 		{
-			++session.m_syncStep;
-			if (4 == session.m_syncStep)
+			++session.m_sync_step;
+			if (4 == session.m_sync_step)
 			{
-				if (session.m_dirtyFinancials)
+				if (session.m_dirty_financials)
 				{
-					session.m_syncStep = 2;
+					session.m_sync_step = 2;
 					return;
 				}
 
@@ -945,12 +945,12 @@ void CZhongTaiDispatcher::FinishQuery()
 				session.m_ready = true;
 				session.m_attempt = 0;
 				session.m_refresh = false;
-				session.m_refreshAt = Now() + m_config.m_refreshMs;
-				session.m_snapshot.m_account.m_bConnected = true;
-				session.m_snapshot.m_account.m_nState = 1;
+				session.m_refresh_at = Now() + m_config.m_refresh_ms;
+				session.m_snapshot.m_account.m_connected = true;
+				session.m_snapshot.m_account.m_state = 1;
 				for (auto& item : session.m_orders)
 				{
-					if (session.m_journal.trading_day() == item.second.m_nDay && item.second.m_strBrokerOrderId.empty())
+					if (session.m_journal.trading_day() == item.second.m_day && item.second.m_broker_order_id.empty())
 					{
 						item.second.m_status = Status::Unknown;
 					}
@@ -970,12 +970,12 @@ void CZhongTaiDispatcher::FinishQuery()
 				std::shared_ptr<CZhongTaiSession> counter = session.m_counter.lock();
 				if (nullptr != counter)
 				{
-					for (const auto& event : session.m_initialEvents)
+					for (const auto& event : session.m_initial_events)
 					{
 						counter->Publish(event);
 					}
 				}
-				session.m_initialEvents.clear();
+				session.m_initial_events.clear();
 				CCountEvent event;
 				event.m_kind = EventTy::Session;
 				Publish(session, std::move(event));
@@ -1030,14 +1030,14 @@ void CZhongTaiDispatcher::Handle(CApiEvent event)
 	{
 		for (auto& item : session.m_orders)
 		{
-			if (std::to_string(event.m_cancelOrder) == item.second.m_strBrokerOrderId && session.m_journal.trading_day() == item.second.m_nDay)
+			if (std::to_string(event.m_cancel_order) == item.second.m_broker_order_id && session.m_journal.trading_day() == item.second.m_day)
 			{
-				item.second.m_bCancelPending = false;
+				item.second.m_cancel_pending = false;
 				if (ApiEventType::UnknownOrder == event.m_type)
 				{
 					item.second.m_status = Status::Unknown;
 				}
-				item.second.m_strError = event.m_result.m_strMessage;
+				item.second.m_error_message = event.m_result.m_message;
 				CCountEvent output;
 				output.m_kind = EventTy::Order;
 				output.m_order = item.second;
@@ -1046,9 +1046,9 @@ void CZhongTaiDispatcher::Handle(CApiEvent event)
 		}
 		return;
 	}
-	if (0 != event.m_requestId)
+	if (0 != event.m_request_id)
 	{
-		if (!m_query.has_value() || event.m_requestId != m_query->m_id || session.m_generation != m_query->m_generation || session.m_account != m_query->m_account)
+		if (!m_query.has_value() || event.m_request_id != m_query->m_id || session.m_generation != m_query->m_generation || session.m_account != m_query->m_account)
 		{
 			return;
 		}
@@ -1057,7 +1057,7 @@ void CZhongTaiDispatcher::Handle(CApiEvent event)
 			Fail(session, event.m_result);
 			return;
 		}
-		if (event.m_hasRow)
+		if (event.m_has_row)
 		{
 			m_query->m_data.emplace_back(event);
 			++m_query->m_rows;
@@ -1073,8 +1073,8 @@ void CZhongTaiDispatcher::Handle(CApiEvent event)
 				}
 				m_query->m_reference = event.m_reference;
 				m_query->m_rows = 0;
-				m_query->m_pagePending = true;
-				m_nextQueryAt = Now() + m_config.m_queryIntervalMs;
+				m_query->m_page_pending = true;
+				m_next_query_at = Now() + m_config.m_query_interval_ms;
 				// Deadline covers the entire paginated query, not each page.
 				return;
 			}
@@ -1089,7 +1089,7 @@ void CZhongTaiDispatcher::Handle(CApiEvent event)
 	}
 	if (!session.m_ready || (m_query.has_value() && m_query->m_account == session.m_account))
 	{
-		if (session.m_buffer.size() >= m_config.m_queueLimit)
+		if (session.m_buffer.size() >= m_config.m_queue_limit)
 		{
 			Fail(session, { Error::Unavailable, "XTP synchronization buffer overflow" });
 			return;
@@ -1115,17 +1115,17 @@ void CZhongTaiDispatcher::Tick()
 	{
 		Fail(m_sessions.at(m_query->m_account), { Error::Timeout, "XTP query timed out" });
 	}
-	if (m_query.has_value() && m_query->m_pagePending && now >= m_nextQueryAt)
+	if (m_query.has_value() && m_query->m_page_pending && now >= m_next_query_at)
 	{
 		CSession& session = m_sessions.at(m_query->m_account);
-		if (std::numeric_limits<int>::max() == m_nextQuery)
+		if (std::numeric_limits<int>::max() == m_next_query)
 		{
 			Fail(session, { Error::Unavailable, "query ID exhausted" }, true);
 		}
 		else
 		{
-			m_query->m_id = m_nextQuery++;
-			m_query->m_pagePending = false;
+			m_query->m_id = m_next_query++;
+			m_query->m_page_pending = false;
 			CResult result = m_api->Query(session.m_session, m_query->m_operation, m_query->m_id, m_query->m_reference);
 			if (!result.Ok())
 			{
@@ -1140,10 +1140,10 @@ void CZhongTaiDispatcher::Tick()
 		{
 			continue;
 		}
-		if (now >= session.m_leaseAt)
+		if (now >= session.m_lease_at)
 		{
 			CResult renewed = m_store->Save(session.m_account, session.m_journal);
-			session.m_leaseAt = now + 5000;
+			session.m_lease_at = now + 5000;
 			if (!renewed.Ok())
 			{
 				Fail(session, renewed, true);
@@ -1152,25 +1152,25 @@ void CZhongTaiDispatcher::Tick()
 		}
 		if (0 == session.m_session)
 		{
-			if (!session.m_password.empty() && now >= session.m_retryAt)
+			if (!session.m_password.empty() && now >= session.m_retry_at)
 			{
 				Login(session);
 			}
 			continue;
 		}
-		if (session.m_ready && now >= session.m_refreshAt && !session.m_refresh)
+		if (session.m_ready && now >= session.m_refresh_at && !session.m_refresh)
 		{
 			session.m_refresh = true;
-			session.m_syncStep = 0;
-			session.m_snapshot.m_account.m_bFundsValid = false;
+			session.m_sync_step = 0;
+			session.m_snapshot.m_account.m_funds_valid = false;
 			Snapshot(session);
 		}
 	}
-	if (m_query.has_value() || now < m_nextQueryAt || m_sessions.empty())
+	if (m_query.has_value() || now < m_next_query_at || m_sessions.empty())
 	{
 		return;
 	}
-	auto mIter = m_sessions.upper_bound(m_lastScheduled);
+	auto mIter = m_sessions.upper_bound(m_last_scheduled);
 	for (std::size_t count = 0; count < m_sessions.size(); ++count)
 	{
 		if (m_sessions.end() == mIter)
@@ -1182,8 +1182,8 @@ void CZhongTaiDispatcher::Tick()
 		{
 			if (!session.m_ready || session.m_refresh)
 			{
-				m_lastScheduled = mIter->first;
-				Query(session, Queries[session.m_syncStep], true);
+				m_last_scheduled = mIter->first;
+				Query(session, Queries[session.m_sync_step], true);
 				return;
 			}
 			if (!session.m_queries.empty())
@@ -1191,7 +1191,7 @@ void CZhongTaiDispatcher::Tick()
 				CWork work = std::move(session.m_queries.front());
 				session.m_queries.pop_front();
 				Operation operation = work.m_request.GetOperation();
-				m_lastScheduled = mIter->first;
+				m_last_scheduled = mIter->first;
 				Query(session, operation, false, std::move(work));
 				return;
 			}
@@ -1207,7 +1207,7 @@ void CZhongTaiDispatcher::Run()
 		std::optional<std::variant<CWork, CApiEvent>> work;
 		bool closing = false;
 		{
-			std::unique_lock<std::mutex> lock(m_mtx_queue);
+			std::unique_lock<std::mutex> lock(m_queue_mutex);
 			m_condition.wait_for(lock, std::chrono::milliseconds(20), [this]()
 			{
 				return m_stopping || !m_queue.empty() || m_overflow.load();
@@ -1230,9 +1230,9 @@ void CZhongTaiDispatcher::Run()
 			if (CWork* incoming = std::get_if<CWork>(&*work); nullptr != incoming)
 			{
 				fallback = incoming->m_handler;
-				failure.m_accountIndex = incoming->m_request.m_accountIndex;
-				failure.m_requestId = incoming->m_request.m_requestId;
-				failure.m_correlationId = incoming->m_request.m_correlationId;
+				failure.m_account_index = incoming->m_request.m_account_index;
+				failure.m_request_id = incoming->m_request.m_request_id;
+				failure.m_correlation_id = incoming->m_request.m_correlation_id;
 				failure.m_operation = incoming->m_request.GetOperation();
 			}
 		}

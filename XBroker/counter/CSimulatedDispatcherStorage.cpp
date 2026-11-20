@@ -58,24 +58,24 @@ namespace
 		{
 			trade::CCalendar day;
 			std::int64_t nDay = 0;
-			if (!value.IsObject() || !Integer(value, "day", nDay) || (0 >= nDay) || (99991231 < nDay) || !Integer(value, "open_ms", day.m_nOpen) || !Integer(value, "break_ms", day.m_nBreak) || !Integer(value, "resume_ms", day.m_nResume) || !Integer(value, "close_ms", day.m_nClose))
+			if (!value.IsObject() || !Integer(value, "day", nDay) || (0 >= nDay) || (99991231 < nDay) || !Integer(value, "open_ms", day.m_open_time_ms) || !Integer(value, "break_ms", day.m_break_time_ms) || !Integer(value, "resume_ms", day.m_resume_time_ms) || !Integer(value, "close_ms", day.m_close_time_ms))
 			{
 				return { trade::Error::Rejected, "calendar requires explicit day and epoch-millisecond sessions" };
 			}
-			day.m_nDay = static_cast<int>(nDay);
+			day.m_day = static_cast<int>(nDay);
 			calendar.emplace_back(day);
 		}
 		for (const auto& value : document["rules"].GetArray())
 		{
 			trade::CRule rule;
 			std::int64_t nDay = 0, nScale = 0;
-			if (!value.IsObject() || !Text(value, "version", rule.m_strVersion) || !Text(value, "security", rule.m_strSecurity) || !Text(value, "board", rule.m_strBoard) || !Integer(value, "day", nDay) || (0 >= nDay) || (99991231 < nDay) || !Integer(value, "price_scale", nScale) || (0 > nScale) || (6 < nScale) || !Integer(value, "tick", rule.m_nTick) || !Integer(value, "buy_minimum", rule.m_nBuyMinimum) || !Integer(value, "buy_step", rule.m_nBuyStep) || !Integer(value, "sell_minimum", rule.m_nSellMinimum) || !Integer(value, "sell_step", rule.m_nSellStep) || !Integer(value, "lower", rule.m_nLower) || !Integer(value, "upper", rule.m_nUpper) || !Integer(value, "commission_ppm", rule.m_nCommissionPpm) || !Integer(value, "minimum_fee_cents", rule.m_nMinimumFee) || !Integer(value, "sell_tax_ppm", rule.m_nSellTaxPpm) || !Integer(value, "transfer_ppm", rule.m_nTransferPpm) || !value.HasMember("corporate_action") || !value["corporate_action"].IsBool())
+			if (!value.IsObject() || !Text(value, "version", rule.m_version_text) || !Text(value, "security", rule.m_security) || !Text(value, "board", rule.m_board) || !Integer(value, "day", nDay) || (0 >= nDay) || (99991231 < nDay) || !Integer(value, "price_scale", nScale) || (0 > nScale) || (6 < nScale) || !Integer(value, "tick", rule.m_tick) || !Integer(value, "buy_minimum", rule.m_buy_minimum) || !Integer(value, "buy_step", rule.m_buy_step) || !Integer(value, "sell_minimum", rule.m_sell_minimum) || !Integer(value, "sell_step", rule.m_sell_step) || !Integer(value, "lower", rule.m_lower) || !Integer(value, "upper", rule.m_upper) || !Integer(value, "commission_ppm", rule.m_commission_ppm) || !Integer(value, "minimum_fee_cents", rule.m_minimum_fee) || !Integer(value, "sell_tax_ppm", rule.m_sell_tax_ppm) || !Integer(value, "transfer_ppm", rule.m_transfer_ppm) || !value.HasMember("corporate_action") || !value["corporate_action"].IsBool())
 			{
 				return { trade::Error::Rejected, "security rule fields must be explicit" };
 			}
-			rule.m_nDay = static_cast<int>(nDay);
-			rule.m_nPriceScale = static_cast<int>(nScale);
-			rule.m_bCorporateAction = value["corporate_action"].GetBool();
+			rule.m_day = static_cast<int>(nDay);
+			rule.m_price_scale = static_cast<int>(nScale);
+			rule.m_corporate_action = value["corporate_action"].GetBool();
 			rules.emplace_back(std::move(rule));
 		}
 		return {};
@@ -110,12 +110,12 @@ trade::CResult CSimulatedDispatcher::Initialize()
 		{
 			trade::CFunds funds;
 			if ((3 != row.size()) ||
-				!utility::to_number(db::to_string(row[0]), funds.m_accountIndex.first) ||
-				!utility::to_number(db::to_string(row[2]), funds.m_nBalance))
+				!utility::to_number(db::to_string(row[0]), funds.m_account_index.first) ||
+				!utility::to_number(db::to_string(row[2]), funds.m_balance))
 			{
 				return { trade::Error::Rejected, "invalid simulated account" };
 			}
-			funds.m_accountIndex.second = db::to_string(row[1]);
+			funds.m_account_index.second = db::to_string(row[1]);
 			accounts.emplace_back(std::move(funds));
 		}
 		return Start(accounts, rules, calendar);

@@ -19,10 +19,10 @@ public:
 	void Publish(const trade::CCountEvent& event);
 
 private:
-	CSimulatedDispatcher* m_pDispatcher; // Borrowed; the dispatcher closes sessions before destruction.
+	CSimulatedDispatcher* m_dispatcher; // Borrowed; the dispatcher closes sessions before destruction.
 	_TyAccount m_account;
 	std::uint64_t m_instance;
-	mutable std::mutex m_mtx_state;
+	mutable std::mutex m_state_mutex;
 	_TyEventHandler m_handler;
 	_TyReplyHandler m_handler_reply;
 	bool m_closed{ false };

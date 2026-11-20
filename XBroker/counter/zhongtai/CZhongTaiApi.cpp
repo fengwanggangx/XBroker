@@ -22,21 +22,21 @@ namespace trade::zhongtai
 		COrder Order(const XTPOrderInfo& w)
 		{
 			COrder r;
-			r.m_strBrokerOrderId = std::to_string(w.order_xtp_id);
-			r.m_sdkClientId = w.order_client_id;
-			r.m_strSecurity = Security(w.ticker, w.market);
-			r.m_nPrice = Scaled(w.price, 4);
-			r.m_nPriceScale = 4;
-			r.m_nQuantity = w.quantity;
-			r.m_nFilled = w.qty_traded;
-			r.m_nTurnover = Scaled(w.trade_amount, 2);
+			r.m_broker_order_id = std::to_string(w.order_xtp_id);
+			r.m_sdk_client_id = w.order_client_id;
+			r.m_security = Security(w.ticker, w.market);
+			r.m_price = Scaled(w.price, 4);
+			r.m_price_scale = 4;
+			r.m_quantity = w.quantity;
+			r.m_filled = w.qty_traded;
+			r.m_turnover = Scaled(w.trade_amount, 2);
 			r.m_side = XTP_SIDE_BUY == w.side ? Side::Buy : Side::Sell;
-			r.m_nBrokerTime = w.update_time;
-			r.m_nTime = BrokerTime(w.update_time);
-			r.m_nDay = static_cast<int>(w.insert_time / 1000000000LL);
-			r.m_bFeeKnown = false;
-			r.m_bFrozenKnown = false;
-			r.m_strRawStatus = std::to_string(w.order_status) + ":" + std::to_string(w.order_submit_status);
+			r.m_broker_time = w.update_time;
+			r.m_time = BrokerTime(w.update_time);
+			r.m_day = static_cast<int>(w.insert_time / 1000000000LL);
+			r.m_fee_known = false;
+			r.m_frozen_known = false;
+			r.m_raw_status = std::to_string(w.order_status) + ":" + std::to_string(w.order_submit_status);
 			switch (w.order_status)
 			{
 			case XTP_ORDER_STATUS_ALLTRADED:
@@ -67,18 +67,18 @@ namespace trade::zhongtai
 		CTrade Trade(const XTPTradeReport& w)
 		{
 			CTrade r;
-			r.m_strBrokerOrderId = std::to_string(w.order_xtp_id);
-			r.m_strBrokerTradeId = w.exec_id;
-			r.m_reportIndex = w.report_index;
+			r.m_broker_order_id = std::to_string(w.order_xtp_id);
+			r.m_broker_trade_id = w.exec_id;
+			r.m_report_index = w.report_index;
 			r.m_market = static_cast<int>(w.market);
-			r.m_strSecurity = Security(w.ticker, w.market);
-			r.m_nPrice = Scaled(w.price, 4);
-			r.m_nPriceScale = 4;
-			r.m_nQuantity = w.quantity;
-			r.m_nTime = BrokerTime(w.trade_time);
-			r.m_nDay = static_cast<int>(w.trade_time / 1000000000LL);
+			r.m_security = Security(w.ticker, w.market);
+			r.m_price = Scaled(w.price, 4);
+			r.m_price_scale = 4;
+			r.m_quantity = w.quantity;
+			r.m_time = BrokerTime(w.trade_time);
+			r.m_day = static_cast<int>(w.trade_time / 1000000000LL);
 			r.m_side = XTP_SIDE_BUY == w.side ? Side::Buy : Side::Sell;
-			r.m_bFeeKnown = false;
+			r.m_fee_known = false;
 			return r;
 		}
 		struct CRelease
@@ -102,14 +102,14 @@ namespace trade::zhongtai
 			{
 				throw std::runtime_error("XTP allows one API creation per process");
 			}
-			m_api.reset(XTP::API::TraderApi::CreateTraderApi(static_cast<std::uint8_t>(config.m_clientId), config.m_logPath.c_str(), XTP_LOG_LEVEL_INFO));
+			m_api.reset(XTP::API::TraderApi::CreateTraderApi(static_cast<std::uint8_t>(config.m_client_id), config.m_log_path.c_str(), XTP_LOG_LEVEL_INFO));
 			if (nullptr == m_api || 0 != std::strncmp(m_api->GetApiVersion(), "2.2.50.8", 8))
 			{
 				throw std::runtime_error("XTP SDK version must be 2.2.50.8");
 			}
-			m_clientId = static_cast<std::uint8_t>(config.m_clientId);
-			m_api->SetSoftwareKey(config.m_softwareKey.c_str());
-			m_api->SetSoftwareVersion(config.m_softwareVersion.c_str());
+			m_client_id = static_cast<std::uint8_t>(config.m_client_id);
+			m_api->SetSoftwareKey(config.m_software_key.c_str());
+			m_api->SetSoftwareVersion(config.m_software_version.c_str());
 			m_api->SetHeartBeatInterval(15);
 			m_api->SubscribePublicTopic(XTP_TERT_RESTART);
 			m_api->RegisterSpi(this);
@@ -120,7 +120,7 @@ namespace trade::zhongtai
 		}
 		void SetHandler(_TyHandler&& handler) override
 		{
-			std::lock_guard<std::mutex> lock(m_mtx_handler);
+			std::lock_guard<std::mutex> lock(m_handler_mutex);
 			m_handler = std::move(handler);
 		}
 		void Stop() override
@@ -131,12 +131,12 @@ namespace trade::zhongtai
 		CLoginReply Login(const CSite& site, const std::string& account, const std::string& password) override
 		{
 			CLoginReply r;
-			r.m_session = m_api->Login(site.m_host.c_str(), site.m_port, account.c_str(), password.c_str(), XTP_PROTOCOL_TCP, site.m_localIp.empty() ? nullptr : site.m_localIp.c_str());
+			r.m_session = m_api->Login(site.m_host.c_str(), site.m_port, account.c_str(), password.c_str(), XTP_PROTOCOL_TCP, site.m_local_ip.empty() ? nullptr : site.m_local_ip.c_str());
 			if (0 == r.m_session)
 			{
 				r.m_result = LastError();
-				std::string message = r.m_result.m_strMessage;
-				r.m_authFailure = std::string::npos == message.find("connect") && std::string::npos == message.find("Connect") && std::string::npos == message.find("timeout") && std::string::npos == message.find("network") && std::string::npos == message.find("socket") && std::string::npos == message.find("连接") && std::string::npos == message.find("超时");
+				std::string message = r.m_result.m_message;
+				r.m_auth_failure = std::string::npos == message.find("connect") && std::string::npos == message.find("Connect") && std::string::npos == message.find("timeout") && std::string::npos == message.find("network") && std::string::npos == message.find("socket") && std::string::npos == message.find("连接") && std::string::npos == message.find("超时");
 			}
 			else
 			{
@@ -149,7 +149,7 @@ namespace trade::zhongtai
 					m_api->Logout(r.m_session);
 					r.m_session = 0;
 					r.m_result = { Error::Unavailable, "invalid SDK trading day" };
-					r.m_authFailure = true;
+					r.m_auth_failure = true;
 				}
 			}
 			return r;
@@ -191,12 +191,12 @@ namespace trade::zhongtai
 		CResult Submit(std::uint64_t session, const COrder& order, std::uint64_t& brokerId) override
 		{
 			XTPOrderInsertInfo request{};
-			request.order_client_id = order.m_sdkClientId;
-			std::string ticker = order.m_strSecurity.substr(0, 6);
+			request.order_client_id = order.m_sdk_client_id;
+			std::string ticker = order.m_security.substr(0, 6);
 			std::memcpy(request.ticker, ticker.data(), ticker.size());
-			request.market = std::string::npos != order.m_strSecurity.find(".SSE") ? XTP_MKT_SH_A : XTP_MKT_SZ_A;
-			request.price = static_cast<double>(order.m_nPrice) / std::pow(10.0, order.m_nPriceScale);
-			request.quantity = order.m_nQuantity;
+			request.market = std::string::npos != order.m_security.find(".SSE") ? XTP_MKT_SH_A : XTP_MKT_SZ_A;
+			request.price = static_cast<double>(order.m_price) / std::pow(10.0, order.m_price_scale);
+			request.quantity = order.m_quantity;
 			request.price_type = XTP_PRICE_LIMIT;
 			request.side = Side::Buy == order.m_side ? XTP_SIDE_BUY : XTP_SIDE_SELL;
 			request.business_type = XTP_BUSINESS_TYPE_CASH;
@@ -218,7 +218,7 @@ namespace trade::zhongtai
 		{
 			_TyHandler handler;
 			{
-				std::lock_guard<std::mutex> lock(m_mtx_handler);
+				std::lock_guard<std::mutex> lock(m_handler_mutex);
 				handler = m_handler;
 			}
 			if (nullptr != handler)
@@ -232,14 +232,14 @@ namespace trade::zhongtai
 			CApiEvent event;
 			event.m_type = type;
 			event.m_session = session;
-			event.m_requestId = requestId;
+			event.m_request_id = requestId;
 			event.m_last = last;
 			try
 			{
 				convert(event);
 				if (nullptr != error && 0 != error->error_id)
 				{
-					event.m_errorCode = error->error_id;
+					event.m_error_code = error->error_id;
 					event.m_result = { Error::Rejected, std::to_string(error->error_id) + ":" + error->error_msg };
 				}
 			}
@@ -270,14 +270,14 @@ namespace trade::zhongtai
 				if (nullptr != order)
 				{
 					e.m_order = Order(*order);
-					if (m_clientId != m_api->GetClientIDByXTPID(order->order_xtp_id))
+					if (m_client_id != m_api->GetClientIDByXTPID(order->order_xtp_id))
 					{
-						e.m_order.m_sdkClientId = 0;
+						e.m_order.m_sdk_client_id = 0;
 					}
-					e.m_hasRow = true;
+					e.m_has_row = true;
 					if (nullptr != error)
 					{
-						e.m_order.m_strError = error->error_msg;
+						e.m_order.m_error_message = error->error_msg;
 					}
 				}
 			});
@@ -287,7 +287,7 @@ namespace trade::zhongtai
 			CApiEvent event;
 			event.m_type = ApiEventType::UnknownOrder;
 			event.m_session = session;
-			event.m_cancelOrder = orderId;
+			event.m_cancel_order = orderId;
 			Emit(std::move(event));
 		}
 		void OnTradeEvent(XTPTradeReport* trade, std::uint64_t session) override
@@ -297,7 +297,7 @@ namespace trade::zhongtai
 				if (nullptr != trade)
 				{
 					e.m_trade = Trade(*trade);
-					e.m_hasRow = true;
+					e.m_has_row = true;
 				}
 			});
 		}
@@ -307,7 +307,7 @@ namespace trade::zhongtai
 			{
 				if (nullptr != cancel)
 				{
-					e.m_cancelOrder = cancel->order_xtp_id;
+					e.m_cancel_order = cancel->order_xtp_id;
 				}
 			});
 		}
@@ -321,11 +321,11 @@ namespace trade::zhongtai
 					{
 						throw std::runtime_error("only ordinary stock accounts supported");
 					}
-					e.m_hasRow = true;
-					e.m_funds.m_nBalance = Scaled(asset->total_asset - asset->security_asset, 2);
-					e.m_funds.m_nAvailable = Scaled(asset->buying_power, 2);
-					e.m_funds.m_nFrozen = Scaled(asset->withholding_amount, 2);
-					e.m_funds.m_bExplicitAvailable = true;
+					e.m_has_row = true;
+					e.m_funds.m_balance = Scaled(asset->total_asset - asset->security_asset, 2);
+					e.m_funds.m_available = Scaled(asset->buying_power, 2);
+					e.m_funds.m_frozen = Scaled(asset->withholding_amount, 2);
+					e.m_funds.m_explicit_available = true;
 				}
 			});
 		}
@@ -335,12 +335,12 @@ namespace trade::zhongtai
 			{
 				if (nullptr != position)
 				{
-					e.m_hasRow = true;
-					e.m_position.m_strSecurity = Security(position->ticker, position->market);
-					e.m_position.m_nTotal = position->total_qty;
-					e.m_position.m_nAvailable = position->sellable_qty;
-					e.m_position.m_bFrozenKnown = false;
-					e.m_position.m_bCostKnown = false;
+					e.m_has_row = true;
+					e.m_position.m_security = Security(position->ticker, position->market);
+					e.m_position.m_total = position->total_qty;
+					e.m_position.m_available = position->sellable_qty;
+					e.m_position.m_frozen_known = false;
+					e.m_position.m_cost_known = false;
 				}
 			});
 		}
@@ -352,11 +352,11 @@ namespace trade::zhongtai
 				if (nullptr != row && 0 != row->order_xtp_id)
 				{
 					e.m_order = Order(*row);
-					if (m_clientId != m_api->GetClientIDByXTPID(row->order_xtp_id))
+					if (m_client_id != m_api->GetClientIDByXTPID(row->order_xtp_id))
 					{
-						e.m_order.m_sdkClientId = 0;
+						e.m_order.m_sdk_client_id = 0;
 					}
-					e.m_hasRow = true;
+					e.m_has_row = true;
 				}
 			});
 		}
@@ -368,13 +368,13 @@ namespace trade::zhongtai
 				if (nullptr != row && 0 != row->report_index)
 				{
 					e.m_trade = Trade(*row);
-					e.m_hasRow = true;
+					e.m_has_row = true;
 				}
 			});
 		}
 		std::unique_ptr<XTP::API::TraderApi, CRelease> m_api;
-		std::uint8_t m_clientId{ 0 };
-		std::mutex m_mtx_handler;
+		std::uint8_t m_client_id{ 0 };
+		std::mutex m_handler_mutex;
 		_TyHandler m_handler;
 	};
 	std::unique_ptr<IZhongTaiApi> CreateZhongTaiApi(const CConfig& config)

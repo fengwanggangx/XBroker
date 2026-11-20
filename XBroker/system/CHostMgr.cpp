@@ -20,7 +20,7 @@ CHostMgr::CHostMgr()
 
 bool CHostInfo::Valid() const
 {
-	return !m_strName.empty() && !m_strHost.empty() && utility::between(m_nPort, portLowLimit, portUpLimit);
+	return !m_name.empty() && !m_host.empty() && utility::between(m_port, portLowLimit, portUpLimit);
 }
 
 bool CHostInfo::Deserialize(const std::string& key, const std::string& info)
@@ -42,17 +42,17 @@ bool CHostInfo::Deserialize(const std::string& key, const std::string& info)
 		return false;
 	}
 
-	m_strKey = key;
-	m_strName = values.at(0);
-	m_strHost = values.at(1);
-	m_nPort = port;
-	m_bEnabled = "1" == values.at(3);
+	m_key = key;
+	m_name = values.at(0);
+	m_host = values.at(1);
+	m_port = port;
+	m_enabled = "1" == values.at(3);
 	return true;
 }
 
 bool CHostInfo::operator==(const CHostInfo& arg) const
 {
-	return (m_strHost == arg.m_strHost) && (m_nPort == arg.m_nPort);
+	return (m_host == arg.m_host) && (m_port == arg.m_port);
 }
 
 std::string CHostInfo::Serialize() const
@@ -61,7 +61,7 @@ std::string CHostInfo::Serialize() const
 	{
 		return {};
 	}
-	return m_strName + "_" + m_strHost + "_" + std::to_string(m_nPort) + "_" + (m_bEnabled ? "1" : "0");
+	return m_name + "_" + m_host + "_" + std::to_string(m_port) + "_" + (m_enabled ? "1" : "0");
 }
 
 void CHostMgr::Initialize()
@@ -72,7 +72,7 @@ void CHostMgr::Initialize()
 	{
 		if ("connect_fast" == k)
 		{
-			m_bConnectFast = "1" == v;
+			m_connect_fast = "1" == v;
 		}
 		else if (0 == k.find("host"))
 		{
@@ -99,7 +99,7 @@ std::optional<CHostInfo> CHostMgr::GetActiveHost() const
 	for (const auto& v : m_hosts)
 	{
 		const CHostInfo& info = v.second;
-		if (info.m_bEnabled && info.Valid())
+		if (info.m_enabled && info.Valid())
 		{
 			return info;
 		}
@@ -109,12 +109,12 @@ std::optional<CHostInfo> CHostMgr::GetActiveHost() const
 
 bool CHostMgr::SetConnectFast(bool enabled)
 {
-	bool previous = m_bConnectFast;
-	m_bConnectFast = enabled;
+	bool previous = m_connect_fast;
+	m_connect_fast = enabled;
 	return previous;
 }
 
 bool CHostMgr::IsConnectFast() const
 {
-	return m_bConnectFast;
+	return m_connect_fast;
 }

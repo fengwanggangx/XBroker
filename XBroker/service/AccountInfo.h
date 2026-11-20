@@ -20,33 +20,33 @@ enum class TradeAccountState
 
 struct CBrokerInfo
 {
-	std::uint64_t m_brokerId{ 0 };
-	std::string m_strName;
-	std::string m_strAdapter;
+	std::uint64_t m_broker_id{ 0 };
+	std::string m_name;
+	std::string m_adapter;
 	std::set<std::string> m_sites;
 };
 
 struct CTradeAccountInfo
 {
-	std::uint64_t m_brokerId{ 0 };
-	std::string m_strSite;
-	std::string m_strAccount;
-	std::string m_strBrokerName;
-	std::string m_strName;
+	std::uint64_t m_broker_id{ 0 };
+	std::string m_site;
+	std::string m_account;
+	std::string m_broker_name;
+	std::string m_name;
 	TradeAccountState m_state{ TradeAccountState::Disconnected };
-	std::string m_strLastError;
+	std::string m_last_error;
 };
 
 inline _TyAccount AccountIndex(const CTradeAccountInfo& info)
 {
-	return { info.m_brokerId, info.m_strAccount };
+	return { info.m_broker_id, info.m_account };
 }
 
 inline CTradeAccountInfo AccountInfo(const _TyAccount& index)
 {
 	CTradeAccountInfo info;
-	info.m_brokerId = index.first;
-	info.m_strAccount = index.second;
+	info.m_broker_id = index.first;
+	info.m_account = index.second;
 	return info;
 }
 

@@ -42,11 +42,11 @@ private:
 		std::map<std::string, trade::CTrade> m_trades;
 		std::deque<CWork> m_queries;
 		std::vector<trade::zhongtai::CApiEvent> m_buffer;
-		std::vector<trade::CCountEvent> m_initialEvents;
+		std::vector<trade::CCountEvent> m_initial_events;
 		std::optional<CWork> m_login;
-		int m_syncStep{ 0 }, m_attempt{ 0 };
-		bool m_ready{ false }, m_published{ false }, m_refresh{ false }, m_disabled{ false }, m_dirtyFinancials{ false };
-		std::int64_t m_retryAt{ 0 }, m_refreshAt{ 0 }, m_leaseAt{ 0 };
+		int m_sync_step{ 0 }, m_attempt{ 0 };
+		bool m_ready{ false }, m_published{ false }, m_refresh{ false }, m_disabled{ false }, m_dirty_financials{ false };
+		std::int64_t m_retry_at{ 0 }, m_refresh_at{ 0 }, m_lease_at{ 0 };
 	};
 	struct CQuery
 	{
@@ -54,7 +54,7 @@ private:
 		std::uint64_t m_session{ 0 }, m_generation{ 0 };
 		trade::Operation m_operation{ trade::Operation::Funds };
 		int m_id{ 0 };
-		bool m_sync{ false }, m_pagePending{ false };
+		bool m_sync{ false }, m_page_pending{ false };
 		std::int64_t m_deadline{ 0 }, m_reference{ 0 };
 		std::size_t m_rows{ 0 };
 		std::vector<trade::zhongtai::CApiEvent> m_data;
@@ -78,20 +78,20 @@ private:
 	std::unique_ptr<trade::zhongtai::IZhongTaiStore> m_store;
 	std::map<_TyAccount, CSession> m_sessions;
 	std::optional<CQuery> m_query;
-	int m_nextQuery{ 1 };
-	std::set<std::uint64_t> m_usedSessions;
-	std::int64_t m_nextQueryAt{ 0 };
-	_TyAccount m_lastScheduled;
-	std::mutex m_mtx_queue;
-	std::mutex m_mtx_stop;
+	int m_next_query{ 1 };
+	std::set<std::uint64_t> m_used_sessions;
+	std::int64_t m_next_query_at{ 0 };
+	_TyAccount m_last_scheduled;
+	std::mutex m_queue_mutex;
+	std::mutex m_stop_mutex;
 	std::condition_variable m_condition;
 	std::deque<std::variant<CWork, trade::zhongtai::CApiEvent>> m_queue;
 	std::atomic_bool m_overflow{ false };
 	bool m_stopping{ false };
 	std::thread m_worker;
-	std::thread::id m_workerId;
-	std::mutex m_mtx_counters;
+	std::thread::id m_worker_id;
+	std::mutex m_counters_mutex;
 	std::map<_TyAccount, std::uint64_t> m_instances;
 	std::map<_TyAccount, std::weak_ptr<trade::zhongtai::CZhongTaiSession>> m_counters;
-	std::uint64_t m_nextInstance{ 0 };
+	std::uint64_t m_next_instance{ 0 };
 };

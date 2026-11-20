@@ -21,6 +21,6 @@ namespace trade::zhongtai
 
 	private:
 		std::string m_owner;
-		std::map<_TyAccount, std::map<std::uint64_t, std::string>> m_orderRows, m_tradeRows;
+		std::map<_TyAccount, std::map<std::uint64_t, std::string>> m_order_rows, m_trade_rows;
 	};
 } // namespace trade::zhongtai

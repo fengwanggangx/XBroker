@@ -20,14 +20,14 @@ enum class SessionState;
 struct CPendingCounterRequest
 {
 	net::_TyConnectionId m_connection{ -1 };
-	std::uint64_t m_requestId{ 0 };
-	std::uint64_t m_sourceId{ 0 };
-	std::uint64_t m_correlationId{ 0 };
+	std::uint64_t m_request_id{ 0 };
+	std::uint64_t m_source_id{ 0 };
+	std::uint64_t m_correlation_id{ 0 };
 	_TyRequest m_type{ _TyRequest::UNKNOWN };
 	trade::Operation m_operation{ trade::Operation::Funds };
 	_TyAccount m_account;
 	std::shared_ptr<trade::ITradeSession> m_session;
-	std::string m_brokerName;
+	std::string m_broker_name;
 	std::string m_site;
 	std::chrono::steady_clock::time_point m_deadline;
 };
@@ -96,25 +96,25 @@ private:
 
 private:
 	std::unordered_map<_TyRequest, _TyRequestNotify> m_handler_request;
-	mutable std::mutex m_mtx_accounts;
+	mutable std::mutex m_accounts_mutex;
 	std::map<std::uint64_t, CBrokerInfo> m_brokers;
 	std::map<_TyAccount, CTradeAccount> m_accounts;
 	std::map<_TyAccount, std::shared_ptr<trade::ITradeSession>> m_logging;
 	std::vector<std::shared_ptr<trade::ITradeSession>> m_retired;
-	bool m_bStopping{ false };
-	std::string m_strLastError;
+	bool m_stopping{ false };
+	std::string m_last_error;
 	_TyRequestNotify m_handler_push;
-	trade::CCounterFactory m_counterFactory;
+	trade::CCounterFactory m_counter_factory;
 	std::unique_ptr<CSimulatedDispatcher> m_dispatcher_simulated;
 	std::unique_ptr<CZhongTaiDispatcher> m_dispatcher_zhongtai;
 	_TyCounterReplyHandler m_counter_reply;
 	_TyCounterEventHandler m_counter_event;
 	_TyReplyHandler m_handler_reply;
 	_TyDepthHandler m_handler_depth;
-	std::mutex m_mtx_pending;
+	std::mutex m_pending_mutex;
 	std::condition_variable_any m_condition_pending;
 	std::unordered_map<std::uint64_t, CPendingCounterRequest> m_pending;
-	std::uint64_t m_nextCorrelationId{ 0 };
-	bool m_bPendingStopping{ false };
-	std::jthread m_pendingThread;
+	std::uint64_t m_next_correlation_id{ 0 };
+	bool m_pending_stopping{ false };
+	std::jthread m_pending_thread;
 };

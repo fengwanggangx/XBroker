@@ -15,17 +15,17 @@ bool CSimulatedDispatcher::OnMarketResponse(const CRequest& request)
 		return false;
 	}
 	trade::CDepth depth;
-	depth.m_strSecurity = wire.security().symbol() + "." + GetMarketString(static_cast<Exchange>(wire.security().exchange()));
+	depth.m_security = wire.security().symbol() + "." + GetMarketString(static_cast<Exchange>(wire.security().exchange()));
 	std::string strSequence = request.GetExtraData("sequence");
 	if (!utility::to_number(strSequence, depth.m_sequence) || (0 == depth.m_sequence))
 	{
 		return false;
 	}
-	depth.m_nTime = wire.exchange_time_ms();
-	depth.m_nPriceScale = 0 < wire.bids_size() ? wire.bids(0).price_scale() : wire.asks(0).price_scale();
+	depth.m_time = wire.exchange_time_ms();
+	depth.m_price_scale = 0 < wire.bids_size() ? wire.bids(0).price_scale() : wire.asks(0).price_scale();
 	for (const auto& level : wire.bids())
 	{
-		if (level.price_scale() != depth.m_nPriceScale)
+		if (level.price_scale() != depth.m_price_scale)
 		{
 			return false;
 		}
@@ -33,7 +33,7 @@ bool CSimulatedDispatcher::OnMarketResponse(const CRequest& request)
 	}
 	for (const auto& level : wire.asks())
 	{
-		if (level.price_scale() != depth.m_nPriceScale)
+		if (level.price_scale() != depth.m_price_scale)
 		{
 			return false;
 		}

@@ -56,27 +56,27 @@ namespace trade
 			}
 			~CTransaction()
 			{
-				if (!m_bCommitted)
+				if (!m_committed)
 				{
 					m_session.RollBackTransaction();
 				}
 			}
 			bool Commit()
 			{
-				m_bCommitted = m_session.EndTransaction();
-				return m_bCommitted;
+				m_committed = m_session.EndTransaction();
+				return m_committed;
 			}
 
 		private:
 			db::IDataBase& m_session;
-			bool m_bCommitted{ false };
+			bool m_committed{ false };
 		};
 		CResult Failure()
 		{
 			return { Error::Unavailable, "counter storage or lease unavailable; resynchronize before retry" };
 		}
 	} // namespace
-	CStorager::CStorager(std::string strOwner) : m_strOwner(std::move(strOwner))
+	CStorager::CStorager(std::string strOwner) : m_owner(std::move(strOwner))
 	{
 	}
 	bool CStorager::CheckFence(db::IDataBase& session, bool bAcquire)
@@ -97,14 +97,14 @@ namespace trade
 			{
 				return false;
 			}
-			if (!Execute(session, "UPDATE sim_counter_lease SET owner=" + Hex(m_strOwner) + ",fence=fence+1,expires_at=TIMESTAMPADD(SECOND,15,CURRENT_TIMESTAMP(3)) WHERE id=1"))
+			if (!Execute(session, "UPDATE sim_counter_lease SET owner=" + Hex(m_owner) + ",fence=fence+1,expires_at=TIMESTAMPADD(SECOND,15,CURRENT_TIMESTAMP(3)) WHERE id=1"))
 			{
 				return false;
 			}
 			m_fence = nFence + 1;
 			return true;
 		}
-		if ((rows.front()[0] != m_strOwner) || (m_fence != nFence) || ("1" != rows.front()[2]))
+		if ((rows.front()[0] != m_owner) || (m_fence != nFence) || ("1" != rows.front()[2]))
 		{
 			return false;
 		}
@@ -176,7 +176,7 @@ namespace trade
 				}
 				return true;
 			};
-			if (!load("accounts", &CState::m_accounts) || !load("positions", &CState::m_positions) || !load("orders", &CState::m_orders) || !load("trades", &CState::m_trades) || !load("rules", &CState::m_rules) || !load("calendar", &CState::m_calendar) || !load("books", &CState::m_consumedBooks))
+			if (!load("accounts", &CState::m_accounts) || !load("positions", &CState::m_positions) || !load("orders", &CState::m_orders) || !load("trades", &CState::m_trades) || !load("rules", &CState::m_rules) || !load("calendar", &CState::m_calendar) || !load("books", &CState::m_consumed_books))
 			{
 				return { Error::Rejected, "counter row restore failed" };
 			}
@@ -290,10 +290,10 @@ namespace trade
 				return Failure();
 			}
 		}
-		for (const auto& item : state.m_consumedBooks)
+		for (const auto& item : state.m_consumed_books)
 		{
 			CState row;
-			row.m_consumedBooks.emplace(item);
+			row.m_consumed_books.emplace(item);
 			if (!upsert("books", item.first, row))
 			{
 				return Failure();
@@ -313,11 +313,11 @@ namespace trade
 			}
 		}
 		CState metadata;
-		metadata.m_nextOrder = state.m_nextOrder;
-		metadata.m_nextTrade = state.m_nextTrade;
+		metadata.m_next_order = state.m_next_order;
+		metadata.m_next_trade = state.m_next_trade;
 		metadata.m_sequence = state.m_sequence;
-		metadata.m_nSettledDay = state.m_nSettledDay;
-		metadata.m_nClosedDay = state.m_nClosedDay;
+		metadata.m_settled_day = state.m_settled_day;
+		metadata.m_closed_day = state.m_closed_day;
 		if (!Execute(*session, "INSERT INTO sim_counter_checkpoint(id,sequence,body) VALUES(1," + std::to_string(state.m_sequence) + "," + Hex("ROWS1\n" + EncodeState(metadata)) + ") ON DUPLICATE KEY UPDATE sequence=VALUES(sequence),body=VALUES(body)"))
 		{
 			return Failure();
@@ -356,7 +356,7 @@ namespace trade
 		db::_TyDBPtr session = CDBEngine::InstanceRef().GetDBPtr(db::em_database::mysql);
 		if (nullptr != session)
 		{
-			Execute(*session, "UPDATE sim_counter_lease SET expires_at='1970-01-01 00:00:01' WHERE id=1 AND owner=" + Hex(m_strOwner) + " AND fence=" + std::to_string(m_fence));
+			Execute(*session, "UPDATE sim_counter_lease SET expires_at='1970-01-01 00:00:01' WHERE id=1 AND owner=" + Hex(m_owner) + " AND fence=" + std::to_string(m_fence));
 		}
 		m_fence = 0;
 	}

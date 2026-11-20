@@ -58,7 +58,7 @@ namespace trade
 	struct CResult
 	{
 		Error m_error{ Error::None };
-		std::string m_strMessage;
+		std::string m_message;
 		bool Ok() const
 		{
 			return Error::None == m_error;
@@ -66,66 +66,66 @@ namespace trade
 	};
 	struct COrder
 	{
-		_TyAccount m_accountIndex{};
-		std::uint64_t m_clientId{ 0 }, m_orderId{ 0 }, m_requestId{ 0 }, m_strategyId{ 0 }, m_signalId{ 0 };
-		std::string m_strSecurity;
+		_TyAccount m_account_index{};
+		std::uint64_t m_client_id{ 0 }, m_order_id{ 0 }, m_request_id{ 0 }, m_strategy_id{ 0 }, m_signal_id{ 0 };
+		std::string m_security;
 		Side m_side{ Side::Buy };
 		Status m_status{ Status::Accepted };
-		std::int64_t m_nPrice{ 0 }, m_nQuantity{ 0 }, m_nFilled{ 0 }, m_nFrozen{ 0 }, m_nTurnover{ 0 }, m_nFee{ 0 }, m_nTime{ 0 };
-		int m_nPriceScale{ 2 }, m_nDay{ 0 };
-		std::string m_strRuleVersion;
-		std::string m_strBrokerOrderId, m_strRawStatus, m_strError;
-		bool m_bCancelPending{ false }, m_bFeeKnown{ true }, m_bFrozenKnown{ true };
-		std::uint32_t m_sdkClientId{ 0 };
-		std::int64_t m_nBrokerTime{ 0 };
+		std::int64_t m_price{ 0 }, m_quantity{ 0 }, m_filled{ 0 }, m_frozen{ 0 }, m_turnover{ 0 }, m_fee{ 0 }, m_time{ 0 };
+		int m_price_scale{ 2 }, m_day{ 0 };
+		std::string m_rule_version;
+		std::string m_broker_order_id, m_raw_status, m_error_message;
+		bool m_cancel_pending{ false }, m_fee_known{ true }, m_frozen_known{ true };
+		std::uint32_t m_sdk_client_id{ 0 };
+		std::int64_t m_broker_time{ 0 };
 	};
 	struct CPosition
 	{
-		_TyAccount m_accountIndex{};
-		std::string m_strSecurity;
-		std::int64_t m_nTotal{ 0 }, m_nAvailable{ 0 }, m_nFrozen{ 0 }, m_nToday{ 0 }, m_nCost{ 0 };
-		bool m_bFrozenKnown{ true }, m_bCostKnown{ true };
+		_TyAccount m_account_index{};
+		std::string m_security;
+		std::int64_t m_total{ 0 }, m_available{ 0 }, m_frozen{ 0 }, m_today{ 0 }, m_cost{ 0 };
+		bool m_frozen_known{ true }, m_cost_known{ true };
 	};
 	struct CFunds
 	{
-		_TyAccount m_accountIndex{};
-		std::int64_t m_nBalance{ 0 }, m_nFrozen{ 0 };
-		bool m_bConnected{ false }, m_bMigrated{ true };
-		std::int64_t m_nAvailable{ 0 };
-		bool m_bExplicitAvailable{ false }, m_bFundsValid{ true }, m_bFrozenKnown{ true };
-		int m_nState{ 0 };
+		_TyAccount m_account_index{};
+		std::int64_t m_balance{ 0 }, m_frozen{ 0 };
+		bool m_connected{ false }, m_migrated{ true };
+		std::int64_t m_available{ 0 };
+		bool m_explicit_available{ false }, m_funds_valid{ true }, m_frozen_known{ true };
+		int m_state{ 0 };
 	};
 	struct CTrade
 	{
-		std::uint64_t m_tradeId{ 0 }, m_orderId{ 0 };
-		_TyAccount m_accountIndex{};
-		std::string m_strSecurity;
+		std::uint64_t m_trade_id{ 0 }, m_order_id{ 0 };
+		_TyAccount m_account_index{};
+		std::string m_security;
 		Side m_side{ Side::Buy };
-		std::int64_t m_nPrice{ 0 }, m_nQuantity{ 0 }, m_nFee{ 0 }, m_nTime{ 0 };
-		int m_nPriceScale{ 2 };
-		int m_nDay{ 0 };
-		std::string m_strBrokerTradeId, m_strBrokerOrderId;
-		std::uint64_t m_reportIndex{ 0 };
+		std::int64_t m_price{ 0 }, m_quantity{ 0 }, m_fee{ 0 }, m_time{ 0 };
+		int m_price_scale{ 2 };
+		int m_day{ 0 };
+		std::string m_broker_trade_id, m_broker_order_id;
+		std::uint64_t m_report_index{ 0 };
 		int m_market{ 0 };
-		bool m_bFeeKnown{ true };
+		bool m_fee_known{ true };
 	};
 	struct CCountEvent
 	{
-		std::uint64_t m_sequence{ 0 }, m_requestId{ 0 };
-		_TyAccount m_accountIndex{};
+		std::uint64_t m_sequence{ 0 }, m_request_id{ 0 };
+		_TyAccount m_account_index{};
 		EventTy m_kind{ EventTy::Session };
 		COrder m_order;
 		CTrade m_trade;
 		CFunds m_funds;
 		CPosition m_position;
-		bool m_bAccountValid{ true };
-		std::uint64_t m_sessionId{ 0 }; // Source session identity; not serialized or persisted.
+		bool m_account_valid{ true };
+		std::uint64_t m_session_id{ 0 }; // Source session identity; not serialized or persisted.
 	};
 	struct CLoginParam
 	{
 		static constexpr Operation m_operation{ Operation::Login };
-		std::string m_strPassword;
-		std::string m_strSite;
+		std::string m_password;
+		std::string m_site;
 	};
 
 	struct CConnectParam
@@ -147,7 +147,7 @@ namespace trade
 	struct CCancelParam
 	{
 		static constexpr Operation m_operation{ Operation::Cancel };
-		std::uint64_t m_orderId{ 0 };
+		std::uint64_t m_order_id{ 0 };
 	};
 
 	struct CFundsQueryParam
@@ -174,10 +174,10 @@ namespace trade
 
 	struct CReqParam
 	{
-		std::uint64_t m_requestId{ 0 };
-		_TyAccount m_accountIndex{};
+		std::uint64_t m_request_id{ 0 };
+		_TyAccount m_account_index{};
 		_TyRequestParam m_param{ CFundsQueryParam{} };
-		std::uint64_t m_correlationId{ 0 }; // XBroker-local pending key; never serialized.
+		std::uint64_t m_correlation_id{ 0 }; // XBroker-local pending key; never serialized.
 
 		Operation GetOperation() const
 		{
@@ -189,9 +189,9 @@ namespace trade
 	};
 	struct CAccountData
 	{
-		bool m_bReady{ false };
+		bool m_ready{ false };
 		std::uint64_t m_version{ 0 };
-		std::int64_t m_nTime{ 0 };
+		std::int64_t m_time{ 0 };
 		CFunds m_account;
 		std::vector<CPosition> m_positions;
 		std::vector<COrder> m_orders;
@@ -199,56 +199,56 @@ namespace trade
 	};
 	struct COperationReceipt
 	{
-		std::uint64_t m_orderId{ 0 };
+		std::uint64_t m_order_id{ 0 };
 	};
 	using _TyCounterReplyData = std::variant<std::monostate, COperationReceipt, CFunds, std::vector<CPosition>, std::vector<COrder>, std::vector<CTrade>>;
 	struct CCounterReply
 	{
-		std::uint64_t m_requestId{ 0 };
-		_TyAccount m_accountIndex{};
+		std::uint64_t m_request_id{ 0 };
+		_TyAccount m_account_index{};
 		Operation m_operation{ Operation::Funds };
 		CResult m_result;
 		std::uint64_t m_version{ 0 };
-		std::int64_t m_nTime{ 0 };
+		std::int64_t m_time{ 0 };
 		_TyCounterReplyData m_data;
-		std::uint64_t m_correlationId{ 0 };
+		std::uint64_t m_correlation_id{ 0 };
 	};
 	struct CRule
 	{
-		std::string m_strVersion, m_strSecurity, m_strBoard;
-		int m_nDay{ 0 }, m_nPriceScale{ 2 };
-		std::int64_t m_nTick{ 1 }, m_nBuyMinimum{ 100 }, m_nBuyStep{ 100 }, m_nSellMinimum{ 1 }, m_nSellStep{ 1 };
-		std::int64_t m_nLower{ 0 }, m_nUpper{ 0 }, m_nCommissionPpm{ 0 }, m_nMinimumFee{ 0 }, m_nSellTaxPpm{ 0 }, m_nTransferPpm{ 0 };
-		bool m_bCorporateAction{ false };
+		std::string m_version_text, m_security, m_board;
+		int m_day{ 0 }, m_price_scale{ 2 };
+		std::int64_t m_tick{ 1 }, m_buy_minimum{ 100 }, m_buy_step{ 100 }, m_sell_minimum{ 1 }, m_sell_step{ 1 };
+		std::int64_t m_lower{ 0 }, m_upper{ 0 }, m_commission_ppm{ 0 }, m_minimum_fee{ 0 }, m_sell_tax_ppm{ 0 }, m_transfer_ppm{ 0 };
+		bool m_corporate_action{ false };
 	};
 	struct CCalendar
 	{
-		int m_nDay{ 0 };
-		std::int64_t m_nOpen{ 0 }, m_nBreak{ 0 }, m_nResume{ 0 }, m_nClose{ 0 };
+		int m_day{ 0 };
+		std::int64_t m_open_time_ms{ 0 }, m_break_time_ms{ 0 }, m_resume_time_ms{ 0 }, m_close_time_ms{ 0 };
 	};
 	struct CExecutionRule
 	{
 		CRule m_rule;
 		CCalendar m_calendar;
-		bool m_reliableQuery{ false };
-		bool m_idempotentClientId{ false };
+		bool m_reliable_query{ false };
+		bool m_idempotent_client_id{ false };
 	};
 	struct CLevel
 	{
-		std::int64_t m_nPrice{ 0 }, m_nQuantity{ 0 };
+		std::int64_t m_price{ 0 }, m_quantity{ 0 };
 	};
 	struct CDepth
 	{
-		std::string m_strSecurity;
+		std::string m_security;
 		std::uint64_t m_sequence{ 0 };
-		std::int64_t m_nTime{ 0 };
-		int m_nPriceScale{ 2 };
+		std::int64_t m_time{ 0 };
+		int m_price_scale{ 2 };
 		std::vector<CLevel> m_bids, m_asks;
 	};
 	struct CState
 	{
-		std::uint64_t m_nextOrder{ 1 }, m_nextTrade{ 1 }, m_sequence{ 0 };
-		int m_nSettledDay{ 0 }, m_nClosedDay{ 0 };
+		std::uint64_t m_next_order{ 1 }, m_next_trade{ 1 }, m_sequence{ 0 };
+		int m_settled_day{ 0 }, m_closed_day{ 0 };
 		std::map<_TyAccount, CFunds> m_accounts;
 		std::map<std::pair<_TyAccount, std::string>, CPosition> m_positions;
 		std::map<std::uint64_t, COrder> m_orders;
@@ -256,7 +256,7 @@ namespace trade
 		std::vector<CCountEvent> m_events;
 		std::map<std::pair<int, std::string>, CRule> m_rules;
 		std::map<int, CCalendar> m_calendar;
-		std::map<std::string, std::pair<std::int64_t, std::uint64_t>> m_consumedBooks;
+		std::map<std::string, std::pair<std::int64_t, std::uint64_t>> m_consumed_books;
 	};
 	void UpdateAccountData(CAccountData& snapshot, const CCountEvent& event);
 	void ApplyChanges(CState& state, const CState& changes);

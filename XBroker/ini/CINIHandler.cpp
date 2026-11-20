@@ -24,8 +24,8 @@ namespace ini
 
 	std::vector<std::pair<std::string, std::string>> CINIHandler::GetSection(Config config, const std::string& strSection) const
 	{
-		auto mIter = m_iniFiles.find(config);
-		if (m_iniFiles.end() == mIter)
+		auto mIter = m_ini_files.find(config);
+		if (m_ini_files.end() == mIter)
 		{
 			return {};
 		}
@@ -34,20 +34,20 @@ namespace ini
 
 	bool CINIHandler::UpdateEntry(Config config, const std::string& strSection, const std::string& strKey, const std::optional<std::string>& value, const std::string& oldKey)
 	{
-		auto mIter = m_iniFiles.find(config);
-		return m_iniFiles.end() != mIter && mIter->second->UpdateEntry(strSection, strKey, value, oldKey);
+		auto mIter = m_ini_files.find(config);
+		return m_ini_files.end() != mIter && mIter->second->UpdateEntry(strSection, strKey, value, oldKey);
 	}
 
 	bool CINIHandler::Load()
 	{
-		if (!m_iniFiles.empty())
+		if (!m_ini_files.empty())
 		{
 			return true;
 		}
 
 		for (const auto& v : configFiles)
 		{
-			m_iniFiles.emplace(v.first, std::make_unique<CIniFile>(v.second.string()));
+			m_ini_files.emplace(v.first, std::make_unique<CIniFile>(v.second.string()));
 		}
 		return true;
 	}

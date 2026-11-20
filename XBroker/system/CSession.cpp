@@ -19,7 +19,7 @@ CSession::~CSession()
 bool CSession::Start()
 {
 	{
-		std::lock_guard<std::mutex> lock(m_mtx_auth);
+		std::lock_guard<std::mutex> lock(m_auth_mutex);
 		bool bCredentialsValid = (m_auth.has_value() && m_auth->Valid()) || (m_login.has_value() && m_login->Valid());
 		if (!bCredentialsValid)
 		{
@@ -30,7 +30,7 @@ bool CSession::Start()
 	{
 		return true;
 	}
-	m_bStopping.store(false);
+	m_stopping.store(false);
 	m_thread_conn = std::thread(&CSession::ConnectionLoop, this);
 	m_thread_heartbeat = std::thread(&CSession::MaintenanceLoop, this);
 	return true;
@@ -42,11 +42,11 @@ void CSession::Stop()
 	{
 		return;
 	}
-	m_bStopping.store(true);
+	m_stopping.store(true);
 	NotifyState(SessionState::Stopping, "HQMarket session is stopping");
-	m_cv_loops.notify_all();
+	m_loop_condition.notify_all();
 	{
-		std::lock_guard<std::mutex> lock(m_mtx_client);
+		std::lock_guard<std::mutex> lock(m_client_mutex);
 		if (nullptr != m_client)
 		{
 			m_client->ShutDown();
@@ -63,7 +63,7 @@ void CSession::Stop()
 	{
 		decltype(m_client) pClient;
 		{
-			std::lock_guard<std::mutex> lock(m_mtx_client);
+			std::lock_guard<std::mutex> lock(m_client_mutex);
 			pClient = std::move(m_client);
 		}
 		if (nullptr != pClient)
@@ -76,9 +76,9 @@ void CSession::Stop()
 
 void CSession::ClearHandlers()
 {
-	std::lock_guard<std::mutex> lock(m_mtx_handlers);
+	std::lock_guard<std::mutex> lock(m_handlers_mutex);
 	m_handlers.clear();
-	m_stateHandlers.clear();
+	m_state_handlers.clear();
 }
 
 bool CSession::SendRequest(const CRequest& request)
@@ -89,23 +89,23 @@ bool CSession::SendRequest(const CRequest& request)
 	{
 		return false;
 	}
-	std::lock_guard<std::mutex> lock(m_mtx_client);
+	std::lock_guard<std::mutex> lock(m_client_mutex);
 	return (nullptr != m_client) && m_client->SendRequest(request);
 }
 
 void CSession::RegisterHandler(_TyRequestNotify&& handler)
 {
-	std::lock_guard<std::mutex> lock(m_mtx_handlers);
+	std::lock_guard<std::mutex> lock(m_handlers_mutex);
 	m_handlers.emplace_back(std::move(handler));
 }
 
 void CSession::SetStateHandler(_TyStateHandler&& handler)
 {
-	std::lock_guard<std::mutex> lock(m_mtx_handlers);
-	m_stateHandlers.clear();
+	std::lock_guard<std::mutex> lock(m_handlers_mutex);
+	m_state_handlers.clear();
 	if (nullptr != handler)
 	{
-		m_stateHandlers.emplace_back(std::move(handler));
+		m_state_handlers.emplace_back(std::move(handler));
 	}
 }
 
@@ -115,8 +115,8 @@ void CSession::RegisterStateHandler(_TyStateHandler&& handler)
 	{
 		return;
 	}
-	std::lock_guard<std::mutex> lock(m_mtx_handlers);
-	m_stateHandlers.emplace_back(std::move(handler));
+	std::lock_guard<std::mutex> lock(m_handlers_mutex);
+	m_state_handlers.emplace_back(std::move(handler));
 }
 
 SessionState CSession::GetState() const
@@ -138,12 +138,12 @@ bool CSession::IsAuthenticated() const
 void CSession::ConnectionLoop()
 {
 	int nReConnectSeconds = 1;
-	while (!m_bStopping.load())
+	while (!m_stopping.load())
 	{
 		NotifyState(1 == nReConnectSeconds ? SessionState::Connecting : SessionState::Reconnecting, 1 == nReConnectSeconds ? "Connecting to HQMarket" : "Reconnecting to HQMarket in " + std::to_string(nReConnectSeconds) + " seconds");
 		std::optional<CLoginInfo> info;
 		{
-			std::lock_guard<std::mutex> lock(m_mtx_auth);
+			std::lock_guard<std::mutex> lock(m_auth_mutex);
 			info = m_auth.has_value() ? m_auth : m_login;
 		}
 		if (!info.has_value() || !info->Valid())
@@ -151,13 +151,13 @@ void CSession::ConnectionLoop()
 			NotifyState(SessionState::Disconnected, "HQMarket login information is invalid");
 			break;
 		}
-		decltype(m_client) pClient = std::make_unique<net::CTcpClient>(info->m_host.m_strHost, static_cast<int>(info->m_host.m_nPort), info->m_bOrdered);
+		decltype(m_client) pClient = std::make_unique<net::CTcpClient>(info->m_host.m_host, static_cast<int>(info->m_host.m_port), info->m_ordered);
 		pClient->RegisterHandler(std::bind_front(&CSession::OnClientNetEvent, this));
 		int nRet = pClient->Initialize();
 		if (0 == nRet)
 		{
 			{
-				std::lock_guard<std::mutex> lock(m_mtx_client);
+				std::lock_guard<std::mutex> lock(m_client_mutex);
 				m_client = std::move(pClient);
 			}
 			m_client->Start(true);
@@ -169,39 +169,39 @@ void CSession::ConnectionLoop()
 		bool bAuthed = IsAuthenticated();
 		decltype(m_client) pClosedClient;
 		{
-			std::lock_guard<std::mutex> lock(m_mtx_client);
+			std::lock_guard<std::mutex> lock(m_client_mutex);
 			pClosedClient = std::move(m_client);
 		}
 		if (nullptr != pClosedClient)
 		{
 			pClosedClient->Release();
 		}
-		if (m_bStopping.load())
+		if (m_stopping.load())
 		{
 			break;
 		}
 		NotifyState(SessionState::Disconnected, "HQMarket connection closed");
-		std::unique_lock<std::mutex> lock(m_mtx_loops);
-		m_cv_loops.wait_for(lock, std::chrono::seconds(nReConnectSeconds), [this]()
+		std::unique_lock<std::mutex> lock(m_loops_mutex);
+		m_loop_condition.wait_for(lock, std::chrono::seconds(nReConnectSeconds), [this]()
 		{
-			return m_bStopping.load();
+			return m_stopping.load();
 		});
-		nReConnectSeconds = bAuthed ? 1 : (std::min)(m_nMaxReconnectSeconds, nReConnectSeconds * 2);
+		nReConnectSeconds = bAuthed ? 1 : (std::min)(m_max_reconnect_seconds, nReConnectSeconds * 2);
 	}
 }
 
 void CSession::MaintenanceLoop()
 {
 	std::chrono::steady_clock::time_point nTmNextHearbeat = std::chrono::steady_clock::now();
-	while (!m_bStopping.load())
+	while (!m_stopping.load())
 	{
-		std::unique_lock<std::mutex> lock(m_mtx_loops);
-		m_cv_loops.wait_for(lock, std::chrono::milliseconds(250), [this]()
+		std::unique_lock<std::mutex> lock(m_loops_mutex);
+		m_loop_condition.wait_for(lock, std::chrono::milliseconds(250), [this]()
 		{
-			return m_bStopping.load();
+			return m_stopping.load();
 		});
 		lock.unlock();
-		if (m_bStopping.load())
+		if (m_stopping.load())
 		{
 			break;
 		}
@@ -209,7 +209,7 @@ void CSession::MaintenanceLoop()
 		if (IsAuthenticated() && (nTmNextHearbeat <= now))
 		{
 			SendRequest(request::HeartBeat());
-			nTmNextHearbeat = now + std::chrono::seconds(m_nHeartbeatSeconds);
+			nTmNextHearbeat = now + std::chrono::seconds(m_heartbeat_seconds);
 		}
 	}
 }
@@ -240,11 +240,11 @@ bool CSession::HandleAuthRequest(const CRequest& req)
 	{
 		bool bRetryWithCredentials = false;
 		{
-			std::lock_guard<std::mutex> lock(m_mtx_auth);
-			if (m_login.has_value() && !m_login->m_strToken.empty())
+			std::lock_guard<std::mutex> lock(m_auth_mutex);
+			if (m_login.has_value() && !m_login->m_token.empty())
 			{
-				m_login->m_strToken.clear();
-				bRetryWithCredentials = !m_login->m_strUser.empty() && !m_login->m_strPassword.empty();
+				m_login->m_token.clear();
+				bRetryWithCredentials = !m_login->m_user.empty() && !m_login->m_password.empty();
 			}
 		}
 		if (bRetryWithCredentials)
@@ -257,21 +257,21 @@ bool CSession::HandleAuthRequest(const CRequest& req)
 		return false;
 	}
 	{
-		std::lock_guard<std::mutex> lock(m_mtx_auth);
+		std::lock_guard<std::mutex> lock(m_auth_mutex);
 		if (m_auth.has_value())
 		{
-			m_auth->m_strToken = req.GetExtraData("token");
+			m_auth->m_token = req.GetExtraData("token");
 			m_login = std::move(m_auth);
 			m_auth.reset();
 		}
 		else if (m_login.has_value() && !req.GetExtraData("token").empty())
 		{
-			m_login->m_strToken = req.GetExtraData("token");
+			m_login->m_token = req.GetExtraData("token");
 		}
 	}
 	m_state.store(SessionState::Ready);
 	{
-		std::lock_guard<std::mutex> lock(m_mtx_client);
+		std::lock_guard<std::mutex> lock(m_client_mutex);
 		if (nullptr != m_client)
 		{
 			m_client->SetReadTimeout(20);
@@ -297,7 +297,7 @@ bool CSession::SendAuthentication()
 {
 	std::optional<CLoginInfo> info;
 	{
-		std::lock_guard<std::mutex> lock(m_mtx_auth);
+		std::lock_guard<std::mutex> lock(m_auth_mutex);
 		info = m_auth.has_value() ? m_auth : m_login;
 	}
 	if (!info.has_value() || !info->Valid())
@@ -306,11 +306,11 @@ bool CSession::SendAuthentication()
 		return false;
 	}
 	NotifyState(SessionState::Authenticating, "Authenticating with HQMarket");
-	if (!info->m_strToken.empty())
+	if (!info->m_token.empty())
 	{
-		return SendRequest(request::Auth(info->m_strToken));
+		return SendRequest(request::Auth(info->m_token));
 	}
-	return SendRequest(request::Auth(info->m_strUser, info->m_strPassword));
+	return SendRequest(request::Auth(info->m_user, info->m_password));
 }
 
 void CSession::NotifyState(SessionState state, const std::string& strMessage)
@@ -318,8 +318,8 @@ void CSession::NotifyState(SessionState state, const std::string& strMessage)
 	m_state.store(state);
 	std::vector<_TyStateHandler> handlers;
 	{
-		std::lock_guard<std::mutex> lock(m_mtx_handlers);
-		handlers = m_stateHandlers;
+		std::lock_guard<std::mutex> lock(m_handlers_mutex);
+		handlers = m_state_handlers;
 	}
 	for (const auto& handler : handlers)
 	{
@@ -334,7 +334,7 @@ void CSession::Dispatch(const CRequest& req)
 {
 	std::vector<_TyRequestNotify> handlers;
 	{
-		std::lock_guard<std::mutex> lock(m_mtx_handlers);
+		std::lock_guard<std::mutex> lock(m_handlers_mutex);
 		handlers = m_handlers;
 	}
 	for (const auto& handler : handlers)

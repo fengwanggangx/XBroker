@@ -19,10 +19,10 @@ namespace trade::zhongtai
 		void SetSnapshot(const CAccountData& snapshot);
 
 	private:
-		CZhongTaiDispatcher* m_pDispatcher; // Borrowed; the dispatcher closes sessions before destruction.
+		CZhongTaiDispatcher* m_dispatcher; // Borrowed; the dispatcher closes sessions before destruction.
 		_TyAccount m_account;
 		std::uint64_t m_instance;
-		mutable std::mutex m_mtx_state;
+		mutable std::mutex m_state_mutex;
 		CAccountData m_snapshot;
 		_TyEventHandler m_handler;
 		_TyReplyHandler m_handler_reply;

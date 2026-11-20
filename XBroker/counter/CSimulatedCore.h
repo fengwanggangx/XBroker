@@ -36,7 +36,7 @@ private:
 	const trade::CCalendar* Calendar(std::int64_t nNow) const;
 	std::unique_ptr<trade::ICounterStore> m_store;
 	trade::CState m_state;
-	std::int64_t m_nStartTime{ 0 };
+	std::int64_t m_start_time{ 0 };
 	std::map<std::string, trade::CDepth> m_depths;
-	bool m_bReady{ false }, m_bMarketAvailable{ false };
+	bool m_ready{ false }, m_market_available{ false };
 };

@@ -32,13 +32,13 @@ namespace
 		CSimulatedDispatcher simulatedDispatcher;
 		Check(config.SetValue(ini::Config::System, "Trade", "rules_path", std::string("missing-rules.json")), "set missing rules");
 		result = simulatedDispatcher.Initialize();
-		Check(trade::Error::Rejected == result.m_error && "cannot open Trade.rules_path" == result.m_strMessage, "simulated initialization reads its rules path");
+		Check(trade::Error::Rejected == result.m_error && "cannot open Trade.rules_path" == result.m_message, "simulated initialization reads its rules path");
 		Check(config.SetValue(ini::Config::System, "Trade", "rules_path", std::string("invalid-rules.json")), "set invalid rules");
 		result = simulatedDispatcher.Initialize();
-		Check(trade::Error::Rejected == result.m_error && "invalid counter rules JSON" == result.m_strMessage, "simulated retry validates the rules document");
+		Check(trade::Error::Rejected == result.m_error && "invalid counter rules JSON" == result.m_message, "simulated retry validates the rules document");
 		Check(config.SetValue(ini::Config::System, "Trade", "rules_path", std::string("invalid-calendar.json")), "set invalid calendar");
 		result = simulatedDispatcher.Initialize();
-		Check(trade::Error::Rejected == result.m_error && "calendar requires explicit day and epoch-millisecond sessions" == result.m_strMessage, "simulated initialization validates calendar rows");
+		Check(trade::Error::Rejected == result.m_error && "calendar requires explicit day and epoch-millisecond sessions" == result.m_message, "simulated initialization validates calendar rows");
 		simulatedDispatcher.Stop();
 		simulatedDispatcher.Stop();
 	}

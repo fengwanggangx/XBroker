@@ -16,12 +16,12 @@ CBootLoader::~CBootLoader()
 
 bool CBootLoader::Initialize()
 {
-	if (m_bInitialized)
+	if (m_initialized)
 	{
 		return true;
 	}
-	m_nErrorCode = 0;
-	m_strLastError.clear();
+	m_error_code = 0;
+	m_last_error.clear();
 	m_exec = std::filesystem::current_path();
 
 	net::EnvInitialize();
@@ -39,14 +39,14 @@ bool CBootLoader::Initialize()
 
 	static const std::string cs_hqmarket = "HQMarket";
 	CLoginInfo login;
-	login.m_strUser = config.GetString(ini::Config::System, cs_hqmarket, "user");
-	login.m_strPassword = config.GetString(ini::Config::System, cs_hqmarket, "password");
-	login.m_strToken = config.GetString(ini::Config::System, cs_hqmarket, "token");
+	login.m_user = config.GetString(ini::Config::System, cs_hqmarket, "user");
+	login.m_password = config.GetString(ini::Config::System, cs_hqmarket, "password");
+	login.m_token = config.GetString(ini::Config::System, cs_hqmarket, "token");
 
-	login.m_host.m_strName = cs_hqmarket;
-	login.m_host.m_strHost = config.GetString(ini::Config::System, cs_hqmarket, "host");
-	login.m_host.m_nPort = config.GetInt(ini::Config::System, cs_hqmarket, "port");
-	login.m_bOrdered = true;
+	login.m_host.m_name = cs_hqmarket;
+	login.m_host.m_host = config.GetString(ini::Config::System, cs_hqmarket, "host");
+	login.m_host.m_port = config.GetInt(ini::Config::System, cs_hqmarket, "port");
+	login.m_ordered = true;
 	if (!login.Valid())
 	{
 		return Fail(3, "HQMarket endpoint and login credentials are required");
@@ -63,7 +63,7 @@ bool CBootLoader::Initialize()
 		return Fail(4, "Invalid MySQL host, user, port or pool_size in ini/system.ini");
 	}
 	db::CConnectParam param(strMySqlHost, static_cast<unsigned int>(nMySqlPort), strMySqlUser, config.GetString(ini::Config::System, cs_mysql, "password"), strDatabase, "utf8mb4");
-	m_bDatabaseInitialized = true;
+	m_database_initialized = true;
 	if (0 != CDBEngine::InstanceRef().Initialize(db::em_database::mysql, param, nMySqlPoolSize))
 	{
 		return Fail(5, "XBroker MySQL initialization failed");
@@ -80,108 +80,108 @@ bool CBootLoader::Initialize()
 		}
 	}
 
-	m_pMarket = std::make_unique<CSession>(login);
-	m_pTcpServer = std::make_unique<net::CTcpServer>(nPort);
-	m_pTradeService = std::make_unique<CTradeService>();
-	m_pCenter = std::make_unique<CBrokerCenter>(m_pTradeService.get());
-	m_pCenter->SetMarketHandler(std::bind_front(&CSession::SendRequest, m_pMarket.get()));
-	if (!m_pCenter->Initialize())
+	m_market = std::make_unique<CSession>(login);
+	m_tcp_server = std::make_unique<net::CTcpServer>(nPort);
+	m_trade_service = std::make_unique<CTradeService>();
+	m_center = std::make_unique<CBrokerCenter>(m_trade_service.get());
+	m_center->SetMarketHandler(std::bind_front(&CSession::SendRequest, m_market.get()));
+	if (!m_center->Initialize())
 	{
-		return Fail(8, m_pCenter->GetLastError());
+		return Fail(8, m_center->GetLastError());
 	}
-	if (!m_pTradeService->Initialize())
+	if (!m_trade_service->Initialize())
 	{
-		return Fail(9, m_pTradeService->GetLastError());
+		return Fail(9, m_trade_service->GetLastError());
 	}
-	m_pTcpServer->RegisterHandler(std::bind_front(&CBrokerCenter::OnClientNetEvent, m_pCenter.get()));
-	m_pMarket->RegisterHandler(std::bind_front(&CBrokerCenter::OnHQMarketReply, m_pCenter.get()));
-	m_pMarket->RegisterStateHandler(std::bind_front(&CBrokerCenter::OnHQMarketState, m_pCenter.get()));
-	m_bInitialized = true;
+	m_tcp_server->RegisterHandler(std::bind_front(&CBrokerCenter::OnClientNetEvent, m_center.get()));
+	m_market->RegisterHandler(std::bind_front(&CBrokerCenter::OnHQMarketReply, m_center.get()));
+	m_market->RegisterStateHandler(std::bind_front(&CBrokerCenter::OnHQMarketState, m_center.get()));
+	m_initialized = true;
 	return true;
 }
 
 bool CBootLoader::Run()
 {
-	if (!m_bInitialized || nullptr == m_pTcpServer || nullptr == m_pMarket)
+	if (!m_initialized || nullptr == m_tcp_server || nullptr == m_market)
 	{
 		return Fail(10, "XBroker boot loader is not initialized");
 	}
-	if (0 != m_pTcpServer->Initialize())
+	if (0 != m_tcp_server->Initialize())
 	{
-		m_nErrorCode = 11;
-		m_strLastError = "XBroker TCP server initialization failed";
+		m_error_code = 11;
+		m_last_error = "XBroker TCP server initialization failed";
 		return false;
 	}
-	if (!m_pMarket->Start())
+	if (!m_market->Start())
 	{
-		m_nErrorCode = 12;
-		m_strLastError = "HQMarket session initialization failed";
+		m_error_code = 12;
+		m_last_error = "HQMarket session initialization failed";
 		return false;
 	}
-	m_pTcpServer->Start(true);
+	m_tcp_server->Start(true);
 	return true;
 }
 
 void CBootLoader::Finalize()
 {
-	if (nullptr != m_pTcpServer)
+	if (nullptr != m_tcp_server)
 	{
-		m_pTcpServer->ShutDown();
-		m_pTcpServer->Drain();
+		m_tcp_server->ShutDown();
+		m_tcp_server->Drain();
 	}
-	if (nullptr != m_pMarket)
+	if (nullptr != m_market)
 	{
-		m_pMarket->Stop();
-		m_pMarket->ClearHandlers();
+		m_market->Stop();
+		m_market->ClearHandlers();
 	}
-	if (nullptr != m_pTcpServer)
+	if (nullptr != m_tcp_server)
 	{
-		m_pTcpServer->ClearHandlers();
+		m_tcp_server->ClearHandlers();
 	}
-	if (nullptr != m_pTradeService)
+	if (nullptr != m_trade_service)
 	{
-		m_pTradeService->Stop();
+		m_trade_service->Stop();
 	}
-	if (nullptr != m_pCenter)
+	if (nullptr != m_center)
 	{
-		m_pCenter->Stop();
+		m_center->Stop();
 	}
-	m_pCenter.reset();
-	m_pTradeService.reset();
-	m_pTcpServer.reset();
-	m_pMarket.reset();
-	if (m_bDatabaseInitialized)
+	m_center.reset();
+	m_trade_service.reset();
+	m_tcp_server.reset();
+	m_market.reset();
+	if (m_database_initialized)
 	{
 		CDBEngine::InstanceRef().Close();
-		m_bDatabaseInitialized = false;
+		m_database_initialized = false;
 	}
-	m_bInitialized = false;
+	m_initialized = false;
 }
 
 bool CBootLoader::Fail(int nErrorCode, const std::string& strMessage)
 {
-	m_nErrorCode = nErrorCode;
-	m_strLastError = strMessage;
+	m_error_code = nErrorCode;
+	m_last_error = strMessage;
 	Finalize();
 	return false;
 }
 
 const std::string& CBootLoader::GetLastError() const
 {
-	return m_strLastError;
+	return m_last_error;
 }
 
 int CBootLoader::GetErrorCode() const
 {
-	return m_nErrorCode;
+	return m_error_code;
 }
 
 net::CTcpServer& CBootLoader::GetTcpServer()
 {
-	return *m_pTcpServer;
+	return *m_tcp_server;
 }
 
 CSession& CBootLoader::GetSession()
 {
-	return *m_pMarket;
+	return *m_market;
 }
