@@ -1,3 +1,4 @@
+#include "../log/CLogger.h"
 #include "CSession.h"
 #include "../request/RequestCenter.h"
 #include "../network/CTcpClient.h"
@@ -164,7 +165,7 @@ void CSession::ConnectionLoop()
 		}
 		else
 		{
-			std::cerr << "HQMarket connection initialization failed: " << nRet << '\n';
+			CLogger::Write(Level::Error, "system", "HQMarket connection initialization failed: ", nRet);
 		}
 		bool bAuthed = IsAuthenticated();
 		decltype(m_client) pClosedClient;

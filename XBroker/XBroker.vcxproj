@@ -94,7 +94,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>./request;./include/debug/libevent;./include/debug/protobuf;./include/debug/mysql;./include/debug/ini;./include/debug/sqlite;./include/debug/rapidjson;%(ClCompile.AdditionalIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./request;./include/debug/libevent;./include/debug/spdlog;./include/debug/protobuf;./include/debug/mysql;./include/debug/ini;./include/debug/sqlite;./include/debug/rapidjson;%(ClCompile.AdditionalIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <CppLanguageStandard>c++20</CppLanguageStandard>
       <PreprocessorDefinitions>XENGINE_DEBUG_BUILD;PROTOBUF_USE_DLLS;_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -107,7 +107,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>./request;./include/release/libevent;./include/release/protobuf;./include/release/mysql;./include/release/ini;./include/release/sqlite;./include/release/rapidjson;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>./request;./include/release/libevent;./include/release/spdlog;./include/release/protobuf;./include/release/mysql;./include/release/ini;./include/release/sqlite;./include/release/rapidjson;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <CppLanguageStandard>c++20</CppLanguageStandard>
       <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -221,10 +221,6 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="libs\debug\**\*" />
-    <None Include="libs\release\**\*" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="counter\zhongtai\CZhongTaiApi.cpp" />
     <ClCompile Include="counter\zhongtai\CZhongTaiSession.cpp" />
     <ClCompile Include="counter\zhongtai\CZhongTaiDispatcher.cpp" />
@@ -236,6 +232,13 @@
     <ClInclude Include="counter\zhongtai\CZhongTaiStore.h" />
     <ClInclude Include="counter\zhongtai\ZhongTaiConvert.h" />
     <ClInclude Include="counter\zhongtai\ZhongTaiTypes.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="counter\ExecutionRulesWire.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="log\CLogger.h" />
+    <ClCompile Include="log\CLogger.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
@@ -256,7 +259,4 @@
     <Error Condition="'$(Platform)'!='x64'" Text="XTP requires Linux x64" />
     <Error Condition="'$(XBrokerXtpSdk)'==''" Text="Set XBrokerXtpSdk to the SDK root on the build host" />
   </Target>
-  <ItemGroup>
-    <ClInclude Include="counter\ExecutionRulesWire.h" />
-  </ItemGroup>
 </Project>

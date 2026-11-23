@@ -18,10 +18,10 @@ if(COUNTER_MYSQL_TESTS)
  find_path(MYSQL_INCLUDE_DIR mysql.h PATH_SUFFIXES mysql)
  find_library(MYSQL_CLIENT mysqlclient REQUIRED)
  find_package(SQLite3 REQUIRED)
- add_executable(counter_mysql_tests tests/MySqlCounterTests.cpp CStorager.cpp
+ add_executable(counter_mysql_tests tests/MySqlCounterTests.cpp CStorager.cpp ../log/CLogger.cpp
   ../database/CDBEngine.cpp ../database/CODBC.cpp ../database/CMySQL.cpp
   ../database/CSQLite3.cpp ../database/COracle.cpp ../database/IDataBase.cpp ../database/common_db.cpp ../common/utility.cpp)
- target_include_directories(counter_mysql_tests PRIVATE ${MYSQL_INCLUDE_DIR} ${MYSQL_INCLUDE_DIR}/..)
+ target_include_directories(counter_mysql_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../include/debug/spdlog" ${MYSQL_INCLUDE_DIR} ${MYSQL_INCLUDE_DIR}/..)
  target_link_libraries(counter_mysql_tests PRIVATE trading_counter ${MYSQL_CLIENT} SQLite::SQLite3)
  add_test(NAME counter_mysql_tests COMMAND counter_mysql_tests)
  set_tests_properties(counter_mysql_tests PROPERTIES SKIP_RETURN_CODE 77)

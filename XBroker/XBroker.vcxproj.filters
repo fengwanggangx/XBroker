@@ -802,6 +802,21 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="counter\ExecutionRulesWire.h" />
+    <ClInclude Include="counter\ExecutionRulesWire.h">
+      <Filter>counter</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="log">
+      <UniqueIdentifier>{5621F882-F0F0-46FE-9A10-25B216F0D28F}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="log\CLogger.h">
+      <Filter>log</Filter>
+    </ClInclude>
+    <ClCompile Include="log\CLogger.cpp">
+      <Filter>log</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
