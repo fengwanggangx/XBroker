@@ -38,5 +38,6 @@ private:
 	trade::CState m_state;
 	std::int64_t m_start_time{ 0 };
 	std::map<std::string, trade::CDepth> m_depths;
+	std::map<std::string, trade::CDepth> mSourceDepths;
 	bool m_ready{ false }, m_market_available{ false };
 };

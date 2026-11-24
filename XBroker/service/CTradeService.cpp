@@ -297,6 +297,11 @@ bool CTradeService::HandleAccountLogin(const CRequest& req)
 	}
 	if (bConnected)
 	{
+		if ("simulated" != broker->second.m_adapter)
+		{
+			SendError(req.GetConnectionId(), req, 6, "Account already connected");
+			return false;
+		}
 		CRequest response = Response(req);
 		trade::CCounterReply reply;
 		reply.m_account_index = account;

@@ -94,6 +94,7 @@ trade::CResult CSimulatedCore::Start(std::int64_t nNow)
 		m_store->Release();
 		return result;
 	}
+	mSourceDepths.clear();
 	m_depths.clear();
 	m_start_time = nNow;
 	m_market_available = false;
@@ -112,6 +113,7 @@ void CSimulatedCore::Stop()
 {
 	m_ready = false;
 	m_market_available = false;
+	mSourceDepths.clear();
 	m_depths.clear();
 	m_store->Release();
 }
@@ -125,6 +127,7 @@ trade::CResult CSimulatedCore::Renew()
 	if (!result.Ok())
 	{
 		m_ready = false;
+		mSourceDepths.clear();
 		m_depths.clear();
 	}
 	return result;
@@ -243,6 +246,7 @@ trade::CResult CSimulatedCore::Commit(trade::CStateEdit& edit)
 		if (!result.Ok())
 		{
 			m_ready = false;
+			mSourceDepths.clear();
 			m_depths.clear();
 		}
 	}
@@ -565,7 +569,7 @@ trade::CResult CSimulatedCore::Match(trade::CStateEdit& edit, trade::CDepth& dep
 {
 	trade::CState& state = edit.State();
 	const trade::CCalendar* day = Calendar(nNow);
-	if (!m_market_available || (nullptr == day) || !InSession(*day, nNow) || (depth.m_time > nNow) || (MaxAgeMs < nNow - depth.m_time))
+	if (!m_market_available || (nullptr == day) || !InSession(*day, nNow) || (0 == depth.m_time) || (depth.m_time > nNow) || (MaxAgeMs < nNow - depth.m_time))
 	{
 		return {};
 	}
@@ -761,10 +765,11 @@ trade::CCounterReply CSimulatedCore::Execute(const trade::CReqParam& request, st
 			if (m_depths.end() != depth)
 			{
 				trade::CDepth remaining = depth->second;
+				std::uint64_t sequenceBeforeMatch = next.m_sequence;
 				result = Match(edit, remaining, nNow);
 				if (result.Ok())
 				{
-					if (next.m_sequence != edit.Sequence())
+					if (next.m_sequence != sequenceBeforeMatch)
 					{
 						edit.Save(&trade::CState::m_consumed_books, remaining.m_security);
 						next.m_consumed_books[remaining.m_security] = { remaining.m_time, remaining.m_sequence };
@@ -818,6 +823,16 @@ trade::CResult CSimulatedCore::OnDepth(trade::CDepth depth, std::int64_t nNow)
 	{
 		return { trade::Error::Unavailable, "market disconnected" };
 	}
+	if (depth.m_bids.empty() && depth.m_asks.empty())
+	{
+		auto previous = m_depths.find(depth.m_security);
+		if ((m_depths.end() != previous) && (previous->second.m_sequence < depth.m_sequence))
+		{
+			previous->second.m_time = 0;
+			previous->second.m_sequence = depth.m_sequence;
+		}
+		return {};
+	}
 	if (depth.m_time < m_start_time)
 	{
 		return Reject("depth predates counter recovery");
@@ -838,6 +853,11 @@ trade::CResult CSimulatedCore::OnDepth(trade::CDepth depth, std::int64_t nNow)
 		return Reject("book liquidity already consumed before recovery");
 	}
 	auto previous = m_depths.find(depth.m_security);
+	auto source = mSourceDepths.find(depth.m_security);
+	if ((mSourceDepths.end() != source) && (source->second.m_time > depth.m_time))
+	{
+		return Reject("out-of-order depth time");
+	}
 	if ((0 == depth.m_sequence) || (depth.m_time > nNow) || (MaxAgeMs < nNow - depth.m_time) || ((m_depths.end() != previous) && ((previous->second.m_sequence >= depth.m_sequence) || (previous->second.m_time > depth.m_time))))
 	{
 		return Reject("duplicate, out-of-order or stale depth");
@@ -868,6 +888,30 @@ trade::CResult CSimulatedCore::OnDepth(trade::CDepth depth, std::int64_t nNow)
 	{
 		return left.m_price > right.m_price;
 	});
+	trade::CDepth sourceDepth = depth;
+	if ((m_depths.end() != previous) && (mSourceDepths.end() != source)
+		&& InSession(*currentDay, source->second.m_time) && (source->second.m_price_scale == depth.m_price_scale))
+	{
+		// Carry forward consumption at each price across overlapping snapshots.
+		auto preserveConsumption = [](std::vector<trade::CLevel>& levels, const std::vector<trade::CLevel>& original,
+			const std::vector<trade::CLevel>& remaining)
+		{
+			for (auto& level : levels)
+			{
+				auto before = std::find_if(original.begin(), original.end(), [&level](const trade::CLevel& entry)
+				{
+					return level.m_price == entry.m_price;
+				});
+				if (original.end() != before)
+				{
+					std::size_t index = static_cast<std::size_t>(before - original.begin());
+					level.m_quantity = std::max<std::int64_t>(0, level.m_quantity - (before->m_quantity - remaining[index].m_quantity));
+				}
+			}
+		};
+		preserveConsumption(depth.m_bids, source->second.m_bids, previous->second.m_bids);
+		preserveConsumption(depth.m_asks, source->second.m_asks, previous->second.m_asks);
+	}
 	trade::CStateEdit edit(m_state);
 	trade::CState& next = edit.State();
 	result = Match(edit, depth, nNow);
@@ -879,13 +923,18 @@ trade::CResult CSimulatedCore::OnDepth(trade::CDepth depth, std::int64_t nNow)
 	}
 	if (result.Ok())
 	{
+		mSourceDepths[depth.m_security] = std::move(sourceDepth);
 		m_depths[depth.m_security] = std::move(depth);
 	}
 	return result;
 }
 void CSimulatedCore::ForgetDepth(const std::string& security)
 {
-	m_depths.erase(security);
+	auto previous = m_depths.find(security);
+	if (m_depths.end() != previous)
+	{
+		previous->second.m_time = 0;
+	}
 }
 
 void CSimulatedCore::OnMarketState(bool bAvailable)
@@ -893,7 +942,11 @@ void CSimulatedCore::OnMarketState(bool bAvailable)
 	m_market_available = bAvailable;
 	if (!bAvailable)
 	{
-		m_depths.clear();
+		for (auto& item : m_depths)
+		{
+			item.second.m_time = 0;
+			item.second.m_sequence = 0;
+		}
 	}
 }
 trade::CAccountData CSimulatedCore::Snapshot(const _TyAccount& account, std::int64_t nNow) const

@@ -335,8 +335,14 @@ trade::CAccountData CSimulatedDispatcher::Snapshot(const _TyAccount& account) co
 void CSimulatedDispatcher::OnDepth(trade::CDepth depth)
 {
 	std::lock_guard<std::mutex> lock(m_state_mutex);
-	if (m_stopping || (4096 <= m_work.size()))
+	if (m_stopping)
 	{
+		return;
+	}
+	if (4096 <= m_work.size())
+	{
+		++m_epoch;
+		m_condition.notify_one();
 		return;
 	}
 	std::uint64_t nEpoch = m_epoch.load();

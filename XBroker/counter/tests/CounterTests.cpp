@@ -283,6 +283,10 @@ namespace
 		Check(snapshot.m_orders[0].m_fee == 20 && snapshot.m_account.m_balance == 800080, "cumulative fee exact");
 		Check(!counter.OnDepth(CDepth{ "600000.SSE", 2, 1000, 2, {}, { { 1000, 100 } } }, 1100).Ok(), "out of order timestamp");
 		Check(!counter.OnDepth(CDepth{ "600000.SSE", 3, 0, 2, {}, { { 1000, 100 } } }, 7000).Ok(), "stale depth");
+		Check(counter.OnDepth(CDepth{ "600000.SSE", 4, 1100, 2, {}, { { 998, 100 } } }, 1100).Ok(), "live depth before invalidation");
+		Check(counter.OnDepth(CDepth{ "600000.SSE", 5, 0, 2, {}, {} }, 1100).Ok(), "empty depth invalidates prior prices");
+		Check(counter.Execute(Request(Operation::Submit, TestAccount(1), 8), 1100).m_result.Ok(), "submit after invalidation");
+		Check(Status::Accepted == counter.Snapshot(TestAccount(1), 1100).m_orders.back().m_status, "invalidated depth cannot fill");
 		counter.OnMarketState(false);
 		Check(!counter.Execute(Request(Operation::Submit, TestAccount(1), 7), 1200).m_result.Ok(), "offline new order");
 		Check(counter.Execute(Request(Operation::Funds), 1200).m_result.Ok(), "offline query");
@@ -611,6 +615,18 @@ namespace
 		Check(2 == snapshot.m_trades.size() + other.m_trades.size(), "partial fills");
 		Check(100 == other.m_orders[0].m_filled && 50 == snapshot.m_orders[0].m_filled, "price priority across accounts");
 		Check(!counter.OnDepth(depth, 1100).Ok() && 2 == counter.Snapshot(TestAccount(1), 1100).m_trades.size() + counter.Snapshot(TestAccount(2), 1100).m_trades.size(), "duplicate liquidity");
+		CDepth repeatedDepth = depth;
+		++repeatedDepth.m_sequence;
+		Check(counter.OnDepth(repeatedDepth, 1100).Ok(), "repeated polling snapshot");
+		Check(50 == counter.Snapshot(TestAccount(1), 1100).m_orders[0].m_filled, "new sequence does not replenish consumed liquidity");
+		++repeatedDepth.m_sequence;
+		repeatedDepth.m_bids.front().m_price = 991;
+		Check(counter.OnDepth(repeatedDepth, 1100).Ok(), "bid-only update");
+		Check(50 == counter.Snapshot(TestAccount(1), 1100).m_orders[0].m_filled, "bid change does not replenish asks");
+		counter.ForgetDepth(depth.m_security);
+		++repeatedDepth.m_sequence;
+		Check(counter.OnDepth(repeatedDepth, 1100).Ok(), "resubscribed depth");
+		Check(50 == counter.Snapshot(TestAccount(1), 1100).m_orders[0].m_filled, "resubscribe preserves consumption");
 		Check(std::get<COperationReceipt>(counter.Execute(Request(Operation::Submit, TestAccount(1), 10, 200), 1100).m_data).m_order_id == std::get<COperationReceipt>(first.m_data).m_order_id, "idempotency");
 		Check(!counter.Execute(Request(Operation::Submit, TestAccount(1), 10, 300), 1100).m_result.Ok(), "id conflict");
 		CReqParam sell = Request(Operation::Submit, TestAccount(1), 12, 1);
@@ -627,7 +643,7 @@ namespace
 		std::get<trade::CSubmitParam>(sell.m_param).m_order.m_client_id = 13;
 		sell.m_request_id = 13;
 		Check(counter.Execute(sell, 5100).m_result.Ok(), "sell next day");
-		depth.m_sequence = 2;
+		depth.m_sequence = 5;
 		depth.m_time = 5100;
 		depth.m_bids[0].m_price = 1000;
 		Check(counter.OnDepth(depth, 5100).Ok(), "sell fill");

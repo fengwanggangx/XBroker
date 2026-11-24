@@ -190,8 +190,13 @@ namespace trade::zhongtai
 				changedTrades.emplace(trade.trade_id(), std::move(body));
 			}
 		}
-		request::ZhongTaiJournal next = journal;
+		request::ZhongTaiJournal next;
 		next.set_revision(journal.revision() + 1);
+		next.set_sequence(journal.sequence());
+		next.set_next_order(journal.next_order());
+		next.set_next_trade(journal.next_trade());
+		next.set_trading_day(journal.trading_day());
+		next.GetReflection()->MutableUnknownFields(&next)->MergeFrom(journal.GetReflection()->GetUnknownFields(journal));
 		for (const auto& event : journal.events())
 		{
 			if (0 != database->ExecUpdate("INSERT INTO xtp_events VALUES(" + key + "," + std::to_string(event.sequence()) + "," + Hex(event.SerializeAsString()) + ")"))
@@ -199,9 +204,6 @@ namespace trade::zhongtai
 				return Failure();
 			}
 		}
-		next.clear_events();
-		next.clear_orders();
-		next.clear_trades();
 		if (0 != database->ExecUpdate("UPDATE xtp_journal SET revision=" + std::to_string(next.revision()) + ",payload=" + Hex(next.SerializeAsString()) + ",expires=TIMESTAMPADD(SECOND,30,CURRENT_TIMESTAMP(3)) WHERE account_key=" + key) || !transaction.Commit())
 		{
 			return Failure();

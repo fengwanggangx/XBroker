@@ -176,8 +176,8 @@ public:
 		Check(service.OnRequest(login), "retry creates new session");
 		sessions.back()->Complete(true);
 		Check(1 == service.m_accounts.size() && TradeAccountState::Connected == service.m_accounts.at(account).m_info.m_state, "successful login published");
-		service.OnRequest(login);
-		Check(2 == sessions.size(), "connected duplicate reuses session");
+		Check(!service.OnRequest(login) && responses.back().GetErrorInfo().has_value(), "connected real account login does not return unverified success");
+		Check(2 == sessions.size(), "duplicate leaves connected session intact");
 		Check(0 != sessions.back()->GetId() && sessions.front()->GetId() != sessions.back()->GetId(), "each session has an immutable unique id");
 		trade::CCountEvent stale;
 		stale.m_account_index = account;

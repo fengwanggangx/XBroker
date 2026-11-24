@@ -20,7 +20,7 @@ CHostMgr::CHostMgr()
 
 bool CHostInfo::Valid() const
 {
-	return !m_name.empty() && !m_host.empty() && utility::between(m_port, portLowLimit, portUpLimit);
+	return !m_name.empty() && !m_host.empty() && (portLowLimit <= m_port) && (portUpLimit >= m_port);
 }
 
 bool CHostInfo::Deserialize(const std::string& key, const std::string& info)
@@ -37,7 +37,7 @@ bool CHostInfo::Deserialize(const std::string& key, const std::string& info)
 	}
 
 	unsigned int port = 0;
-	if (!utility::to_number(std::string(values.at(2)), port) || !utility::between(port, portLowLimit, portUpLimit))
+	if (!utility::to_number(std::string(values.at(2)), port) || (portLowLimit > port) || (portUpLimit < port))
 	{
 		return false;
 	}

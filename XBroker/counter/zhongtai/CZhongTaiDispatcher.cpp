@@ -548,6 +548,10 @@ void CZhongTaiDispatcher::Handle(CWork work)
 				{
 					result = { Error::UnknownResult, "previous order outcome requires reconciliation" };
 				}
+				if (result.Ok() && Status::Rejected == item.second.m_status)
+				{
+					result = { Error::Rejected, item.second.m_error_message };
+				}
 				Reply(session, work, result, item.first);
 				return;
 			}
@@ -593,6 +597,10 @@ void CZhongTaiDispatcher::Handle(CWork work)
 		session.m_refresh_at = 0;
 		if (!result.Ok() || 0 == brokerId)
 		{
+			if (result.Ok())
+			{
+				result = { Error::Rejected, "XTP did not return an order ID" };
+			}
 			stored.m_status = Status::Rejected;
 			stored.m_error_message = result.m_message;
 		}
@@ -668,7 +676,16 @@ void CZhongTaiDispatcher::Handle(CWork work)
 		event.m_kind = EventTy::Order;
 		event.m_order = order->second;
 		event.m_request_id = work.m_request.m_request_id;
-		Publish(session, std::move(event));
+		try
+		{
+			Publish(session, std::move(event));
+		}
+		catch (...)
+		{
+			Reply(session, work, { Error::UnknownResult, "cancel sent but journal update failed" }, id);
+			Fail(session, { Error::Unavailable, "storage failure" }, true);
+			return;
+		}
 		Reply(session, work, result, id);
 		return;
 	}
@@ -1041,7 +1058,15 @@ void CZhongTaiDispatcher::Handle(CApiEvent event)
 				CCountEvent output;
 				output.m_kind = EventTy::Order;
 				output.m_order = item.second;
-				Publish(session, std::move(output));
+				try
+				{
+					Publish(session, std::move(output));
+				}
+				catch (...)
+				{
+					Fail(session, { Error::Unavailable, "cancel callback journal update failed" }, true);
+					return;
+				}
 			}
 		}
 		return;
@@ -1097,8 +1122,15 @@ void CZhongTaiDispatcher::Handle(CApiEvent event)
 		session.m_buffer.emplace_back(std::move(event));
 		return;
 	}
-	Apply(session, event);
-	Snapshot(session);
+	try
+	{
+		Apply(session, event);
+		Snapshot(session);
+	}
+	catch (const std::exception& error)
+	{
+		Fail(session, { Error::Unavailable, error.what() }, true);
+	}
 }
 
 void CZhongTaiDispatcher::Tick()

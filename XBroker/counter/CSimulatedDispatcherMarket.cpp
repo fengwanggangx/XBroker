@@ -10,10 +10,6 @@ bool CSimulatedDispatcher::OnMarketResponse(const CRequest& request)
 		return false;
 	}
 	const _TyDepthData& wire = request.GetData().depth();
-	if (wire.stale() || (0 == wire.bids_size() + wire.asks_size()))
-	{
-		return false;
-	}
 	trade::CDepth depth;
 	depth.m_security = wire.security().symbol() + "." + GetMarketString(static_cast<Exchange>(wire.security().exchange()));
 	std::string strSequence = request.GetExtraData("sequence");
@@ -21,7 +17,12 @@ bool CSimulatedDispatcher::OnMarketResponse(const CRequest& request)
 	{
 		return false;
 	}
-	depth.m_time = wire.exchange_time_ms();
+	if (wire.stale() || (0 == wire.bids_size() + wire.asks_size()))
+	{
+		OnDepth(std::move(depth));
+		return true;
+	}
+	depth.m_time = 0 != wire.exchange_time_ms() ? wire.exchange_time_ms() : wire.receive_time_ms();
 	depth.m_price_scale = 0 < wire.bids_size() ? wire.bids(0).price_scale() : wire.asks(0).price_scale();
 	for (const auto& level : wire.bids())
 	{
