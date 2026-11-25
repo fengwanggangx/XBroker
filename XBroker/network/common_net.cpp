@@ -54,7 +54,7 @@ namespace net
 		return true;
 	}
 
-	std::atomic_bool bThreadEnable{false};
+	std::atomic_bool bThreadEnable{ false };
 
 	void EnvInitialize()
 	{
@@ -124,7 +124,7 @@ namespace net
 		// 根据地址族判断类型
 		if (AF_INET == addr.ss_family)
 		{
-			char buffer[INET_ADDRSTRLEN] = {0};
+			char buffer[INET_ADDRSTRLEN] = { 0 };
 			const auto* pAddr = reinterpret_cast<const struct sockaddr_in*>(&addr);
 			if (!inet_ntop(AF_INET, &pAddr->sin_addr, buffer, INET_ADDRSTRLEN))
 			{
@@ -138,7 +138,7 @@ namespace net
 
 		if (AF_INET6 == addr.ss_family)
 		{
-			char buffer[INET6_ADDRSTRLEN] = {0};
+			char buffer[INET6_ADDRSTRLEN] = { 0 };
 			const auto* pAddr = reinterpret_cast<const struct sockaddr_in6*>(&addr);
 			if (!inet_ntop(AF_INET6, &pAddr->sin6_addr, buffer, INET6_ADDRSTRLEN))
 			{

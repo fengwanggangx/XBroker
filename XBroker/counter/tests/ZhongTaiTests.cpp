@@ -246,7 +246,7 @@ namespace
 		{
 			promise->set_value(reply);
 		}).Ok(),
-			  "request enqueued");
+			"request enqueued");
 		Check(std::future_status::ready == future.wait_for(std::chrono::seconds(4)), "request callback completed");
 		CCounterReply reply = future.get();
 		Check(987654 == reply.m_correlation_id, "XTP reply preserves internal correlation");
@@ -484,7 +484,7 @@ namespace
 		{
 			++rejectedCallbacks;
 		}).Ok() && 0 == rejectedCallbacks.load(),
-			  "mismatch rejected without callback");
+			"mismatch rejected without callback");
 		Check(Send(first, Request(a, Operation::Disconnect)).m_result.Ok(), "business disconnect acknowledged");
 		first->Close();
 		Check(!first->Snapshot().m_ready && !countertest::SendRequest(*first, Request(a, Operation::Funds), {}).Ok(), "closed account unavailable");
@@ -497,7 +497,7 @@ namespace
 		{
 			++rejectedCallbacks;
 		}).Ok() && 0 == rejectedCallbacks.load(),
-			  "stopped dispatcher rejects without callback");
+			"stopped dispatcher rejects without callback");
 		Check(nullptr == dispatcher->Create({ a, "zhongtai_xtp" }), "stopped dispatcher cannot create sessions");
 		dispatcher.reset();
 		Check(!countertest::SendRequest(*replacement, Request(a, Operation::Funds), {}).Ok() && !replacement->Snapshot().m_ready, "session remains safely closed after dispatcher destruction");

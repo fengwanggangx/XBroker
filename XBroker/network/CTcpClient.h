@@ -23,7 +23,7 @@ namespace net
 		using _TyDistributor = CDistributor<true, std::vector<CNetEvent>, _TyHandler>;
 		using _TyOrderedDistributor = CDistributor<false, std::vector<CNetEvent>, _TyHandler>;
 
-		public:
+	public:
 		explicit CTcpClient(const std::string& strAddr, int nPort, bool bOrdered = false);
 		~CTcpClient() override;
 		int Initialize();
@@ -40,13 +40,13 @@ namespace net
 
 		net::_TyConnectionId GetId() const;
 
-		private:
+	private:
 		bool Send(const void* pData, std::size_t nLength);
 		void OnConnected(bufferevent* pEvent) override;
 		std::size_t OnRead(bufferevent* pEvent) override;
 		void OnEvent(bufferevent* pEvent, short events) override;
 
-		private:
+	private:
 		struct CBufferEventDeleter
 		{
 			void operator()(bufferevent* pEvent) const;
@@ -58,11 +58,11 @@ namespace net
 		std::unique_ptr<_TyOrderedDistributor> m_ordered_dispatcher;
 		void Dispatch(std::vector<CNetEvent>&& events);
 
-		private:
-			std::string m_addr;
-			int m_port{ -1 };
+	private:
+		std::string m_addr;
+		int m_port{ -1 };
 
-			net::_TyConnectionId m_router_id{ 0 };
+		net::_TyConnectionId m_router_id{ 0 };
 	};
 } // namespace net
 #endif

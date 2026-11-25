@@ -18,7 +18,7 @@ namespace net
 
 		int m_port{ -1 };
 		std::string m_address;
-		struct sockaddr_storage m_addr { 0 };
+		struct sockaddr_storage m_addr{ 0 };
 		struct bufferevent* m_event{ nullptr };
 
 		CFrameBuffer m_frames;
@@ -26,7 +26,7 @@ namespace net
 		void Empty()
 		{
 			m_fd = -1;
-			if (m_event != nullptr)
+			if (nullptr != m_event)
 			{
 				bufferevent_free(m_event);
 				m_event = nullptr;
@@ -35,7 +35,7 @@ namespace net
 			m_port = -1;
 			m_address.clear();
 			memset(&m_addr, 0, sizeof(m_addr));
-			
+
 			m_frames.Reset();
 		}
 
@@ -190,7 +190,7 @@ namespace net
 
 	net::_TyConnectionId CNetPool::CloseAConnection(struct bufferevent* pEvent)
 	{
-		if (pEvent == nullptr)
+		if (nullptr == pEvent)
 		{
 			return -1;
 		}
@@ -302,7 +302,7 @@ namespace net
 		return Send(mIter->second->m_event, ret->data(), ret->size());
 	}
 
-	//读超时，客户端一定时间没有收到来自服务端的请求则认为断开
+	// 读超时，客户端一定时间没有收到来自服务端的请求则认为断开
 	bool CNetPool::SetReadTimeout(_TyConnectionId id, int nSeconds)
 	{
 		if (0 >= nSeconds)

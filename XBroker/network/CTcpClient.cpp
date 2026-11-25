@@ -189,7 +189,7 @@ namespace net
 
 	void CTcpClient::OnEvent(bufferevent* pEvent, short events)
 	{
-		if (pEvent == nullptr)
+		if (nullptr == pEvent)
 		{
 			return;
 		}

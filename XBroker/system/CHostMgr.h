@@ -26,10 +26,10 @@ struct CHostInfo
 
 class CHostMgr final
 {
-	public:
+public:
 	CHostMgr();
 
-	public:
+public:
 	std::string Key() const;
 	const std::map<std::string, CHostInfo>& GetHosts() const;
 	std::optional<CHostInfo> GetActiveHost() const;
@@ -37,12 +37,12 @@ class CHostMgr final
 	bool SetConnectFast(bool enabled);
 	bool IsConnectFast() const;
 
-	private:
+private:
 	void Initialize();
 
-	private:
-		bool m_connect_fast{ false };
-		std::map<std::string, CHostInfo> m_hosts;
+private:
+	bool m_connect_fast{ false };
+	std::map<std::string, CHostInfo> m_hosts;
 };
 
 #endif

@@ -21,13 +21,20 @@ namespace
 	{
 		switch (method)
 		{
-		case net::HttpMethod::GET: return "GET";
-		case net::HttpMethod::POST: return "POST";
-		case net::HttpMethod::PUT: return "PUT";
-		case net::HttpMethod::DELETE: return "DELETE";
-		case net::HttpMethod::OPTIONS: return "OPTIONS";
-		case net::HttpMethod::PATCH: return "PATCH";
-		default: return "UNKNOWN";
+		case net::HttpMethod::GET:
+			return "GET";
+		case net::HttpMethod::POST:
+			return "POST";
+		case net::HttpMethod::PUT:
+			return "PUT";
+		case net::HttpMethod::DELETE:
+			return "DELETE";
+		case net::HttpMethod::OPTIONS:
+			return "OPTIONS";
+		case net::HttpMethod::PATCH:
+			return "PATCH";
+		default:
+			return "UNKNOWN";
 		}
 	}
 
@@ -35,13 +42,20 @@ namespace
 	{
 		switch (method)
 		{
-		case EVHTTP_REQ_GET: return net::HttpMethod::GET;
-		case EVHTTP_REQ_POST: return net::HttpMethod::POST;
-		case EVHTTP_REQ_PUT: return net::HttpMethod::PUT;
-		case EVHTTP_REQ_DELETE: return net::HttpMethod::DELETE;
-		case EVHTTP_REQ_OPTIONS: return net::HttpMethod::OPTIONS;
-		case EVHTTP_REQ_PATCH: return net::HttpMethod::PATCH;
-		default: return net::HttpMethod::UNKNOWN;
+		case EVHTTP_REQ_GET:
+			return net::HttpMethod::GET;
+		case EVHTTP_REQ_POST:
+			return net::HttpMethod::POST;
+		case EVHTTP_REQ_PUT:
+			return net::HttpMethod::PUT;
+		case EVHTTP_REQ_DELETE:
+			return net::HttpMethod::DELETE;
+		case EVHTTP_REQ_OPTIONS:
+			return net::HttpMethod::OPTIONS;
+		case EVHTTP_REQ_PATCH:
+			return net::HttpMethod::PATCH;
+		default:
+			return net::HttpMethod::UNKNOWN;
 		}
 	}
 
@@ -112,7 +126,8 @@ namespace
 				break;
 			}
 			nBegin = nEnd + 1;
-		} while (nBegin <= strData.size());
+		}
+		while (nBegin <= strData.size());
 		strRet += "\n";
 		return strRet;
 	}
@@ -164,14 +179,20 @@ namespace
 		}
 		return true;
 	}
-}
+} // namespace
 
 namespace net
 {
 	struct CHttpStream::State
 	{
-		struct CloseContext { std::shared_ptr<State> state; };
-		struct DrainContext { std::shared_ptr<State> state; };
+		struct CloseContext
+		{
+			std::shared_ptr<State> state;
+		};
+		struct DrainContext
+		{
+			std::shared_ptr<State> state;
+		};
 
 		event_base* base{ nullptr };
 		evhttp_request* request{ nullptr };
@@ -369,8 +390,8 @@ namespace net
 		std::atomic_int mode{ 0 };
 	};
 
-	HttpMethod CHttpRequest::GetMethod() const 
-	{ 
+	HttpMethod CHttpRequest::GetMethod() const
+	{
 		return m_method;
 	}
 	const std::string& CHttpRequest::GetPath() const
@@ -396,9 +417,14 @@ namespace net
 		return container::vfind(m_queries, strName);
 	}
 
-	CHttpStream::CHttpStream(std::shared_ptr<State> state) : m_state(std::move(state)) {}
+	CHttpStream::CHttpStream(std::shared_ptr<State> state) : m_state(std::move(state))
+	{
+	}
 
-	bool CHttpStream::Send(const std::string& strData) { return Send(std::string(), strData); }
+	bool CHttpStream::Send(const std::string& strData)
+	{
+		return Send(std::string(), strData);
+	}
 
 	bool CHttpStream::Send(const std::string& strEvent, const std::string& strData)
 	{
@@ -425,7 +451,9 @@ namespace net
 		}
 	}
 
-	CHttpResponse::CHttpResponse(std::shared_ptr<State> state) : m_state(std::move(state)) {}
+	CHttpResponse::CHttpResponse(std::shared_ptr<State> state) : m_state(std::move(state))
+	{
+	}
 
 	void CHttpResponse::SetStatus(int nStatus)
 	{
@@ -527,7 +555,7 @@ namespace net
 	{
 	}
 	CHttpServer::~CHttpServer()
-	{ 
+	{
 		Release();
 	}
 
@@ -579,7 +607,7 @@ namespace net
 		}
 		request.m_method = Cmd2Method(evhttp_request_get_command(pRequest));
 
-		//统一资源标识符 Uniform Resource Identifier
+		// 统一资源标识符 Uniform Resource Identifier
 		const char* pURI = evhttp_request_get_uri(pRequest);
 		if (nullptr == pURI)
 		{
@@ -587,7 +615,7 @@ namespace net
 		}
 		request.m_uri = pURI;
 
-		//结构化Uri
+		// 结构化Uri
 		evhttp_uri* pFmtURI = evhttp_uri_parse(request.m_uri.c_str());
 		if (nullptr != pFmtURI)
 		{
@@ -645,35 +673,35 @@ namespace net
 		const auto mIter = m_handlers.find(strRouteKey);
 		if (m_handlers.end() != mIter)
 		{
-			//确定要异步处理后才取得所有权。
+			// 确定要异步处理后才取得所有权。
 			evhttp_request_own(pRequest);
 			event_base* pBase = GetNet();
 			_TyHandler handler = mIter->second;
 			ThreadPoolPtr->PushTask(task_priority::em_normal, 0, [pBase, pRequest, handler = std::move(handler), request = std::move(request)]() mutable
+			{
+				std::unique_ptr<CHttpResponseData> response;
+				try
 				{
-					std::unique_ptr<CHttpResponseData> response;
-					try
-					{
-						response = handler(request);
-						if (nullptr == response)
-						{
-							response = std::make_unique<CHttpResponseData>();
-							response->m_status = HTTP_INTERNAL;
-							response->m_body = "Internal Server Error";
-						}
-					}
-					catch (...)
+					response = handler(request);
+					if (nullptr == response)
 					{
 						response = std::make_unique<CHttpResponseData>();
 						response->m_status = HTTP_INTERNAL;
 						response->m_body = "Internal Server Error";
 					}
+				}
+				catch (...)
+				{
+					response = std::make_unique<CHttpResponseData>();
+					response->m_status = HTTP_INTERNAL;
+					response->m_body = "Internal Server Error";
+				}
 
-					if (!PostAsyncResponse(pBase, pRequest, std::move(response)))
-					{
-						evhttp_request_free(pRequest);
-					}
-				});
+				if (!PostAsyncResponse(pBase, pRequest, std::move(response)))
+				{
+					evhttp_request_free(pRequest);
+				}
+			});
 			return;
 		}
 
@@ -693,9 +721,11 @@ namespace net
 	void CHttpServer::RegisterStream(const std::shared_ptr<CHttpStream::State>& state)
 	{
 		std::lock_guard<std::mutex> lock(m_streams_mutex);
-		m_streams.erase(std::remove_if(m_streams.begin(), m_streams.end(), [](const auto& item) {
+		m_streams.erase(std::remove_if(m_streams.begin(), m_streams.end(), [](const auto& item)
+		{
 			return item.expired();
-		}), m_streams.end());
+		}),
+			m_streams.end());
 		m_streams.emplace_back(state);
 	}
 
@@ -724,5 +754,4 @@ namespace net
 			m_http = nullptr;
 		}
 	}
-}
-
+} // namespace net

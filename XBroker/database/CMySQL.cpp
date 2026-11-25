@@ -60,7 +60,7 @@ namespace db
 	void CMySQL::DisConnect()
 	{
 		std::lock_guard<std::mutex> lock(m_db_mutex);
-		if (m_db != nullptr)
+		if (nullptr != m_db)
 		{
 			mysql_close(m_db);
 		}

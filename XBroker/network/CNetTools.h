@@ -20,5 +20,5 @@ namespace net
 	void SetError(CRequest& request, int code, const std::string& message);
 	void SetError(CRequest& response, const CRequest& request, int code, const std::string& message);
 	void SendError(net::_TyConnectionId id, const CRequest& request, int code, const std::string& message);
-}
+} // namespace net
 #endif

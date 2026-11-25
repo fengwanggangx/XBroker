@@ -889,12 +889,11 @@ trade::CResult CSimulatedCore::OnDepth(trade::CDepth depth, std::int64_t nNow)
 		return left.m_price > right.m_price;
 	});
 	trade::CDepth sourceDepth = depth;
-	if ((m_depths.end() != previous) && (mSourceDepths.end() != source)
-		&& InSession(*currentDay, source->second.m_time) && (source->second.m_price_scale == depth.m_price_scale))
+	if ((m_depths.end() != previous) && (mSourceDepths.end() != source) && InSession(*currentDay, source->second.m_time) && (source->second.m_price_scale == depth.m_price_scale))
 	{
 		// Carry forward consumption at each price across overlapping snapshots.
 		auto preserveConsumption = [](std::vector<trade::CLevel>& levels, const std::vector<trade::CLevel>& original,
-			const std::vector<trade::CLevel>& remaining)
+									   const std::vector<trade::CLevel>& remaining)
 		{
 			for (auto& level : levels)
 			{

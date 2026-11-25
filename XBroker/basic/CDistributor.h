@@ -10,7 +10,7 @@
 #include "../common/defines.h"
 #include "../common/utility.h"
 
-template<bool bAsyn, class _Ty, class _TyHandler>
+template <bool bAsyn, class _Ty, class _TyHandler>
 class CDistributor
 {
 	using _TyData = Typer<_Ty>::type;
@@ -24,7 +24,6 @@ public:
 	}
 
 public:
-
 	void Dispatch(_Ty&& data)
 	{
 		if constexpr (bAsyn)
@@ -43,8 +42,7 @@ public:
 					m_cache.insert(
 						m_cache.end(),
 						std::make_move_iterator(data.begin()),
-						std::make_move_iterator(data.end())
-					);
+						std::make_move_iterator(data.end()));
 				}
 			}
 			else
@@ -77,7 +75,7 @@ public:
 
 	void StopAndWait()
 	{
-		//等待所有任务结束，因为异步任务如果捕获的资源可能在断线等情况下释放重置导致失效，因此释放前要等异步任务执行完成后释放
+		// 等待所有任务结束，因为异步任务如果捕获的资源可能在断线等情况下释放重置导致失效，因此释放前要等异步任务执行完成后释放
 		if constexpr (bAsyn)
 		{
 			std::vector<std::future<int>> tasks;
@@ -99,7 +97,8 @@ private:
 		m_tasks.erase(std::remove_if(m_tasks.begin(), m_tasks.end(), [](std::future<int>& task)
 		{
 			return std::future_status::ready == task.wait_for(std::chrono::seconds(0));
-		}), m_tasks.end());
+		}),
+			m_tasks.end());
 	}
 
 	int AsyncExecute()
@@ -137,7 +136,6 @@ private:
 		}
 		return ret;
 	}
-
 
 	int ExecuteA(const _TyData& data)
 	{

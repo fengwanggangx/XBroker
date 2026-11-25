@@ -24,9 +24,9 @@ std::size_t GetSystemCPUCount()
 
 std::size_t CalcBestPerformanceThreads(pool_type mode)
 {
-	//CPU密集型:CPU数 + 1
-	//IO密集型:CPU数 * 2
-	//CPU数 * (1 + 线程等待时间/线程运行时间)
+	// CPU密集型:CPU数 + 1
+	// IO密集型:CPU数 * 2
+	// CPU数 * (1 + 线程等待时间/线程运行时间)
 	std::size_t nCpus = GetSystemCPUCount();
 
 	if (mode == pool_type::em_more_calc)
@@ -43,7 +43,6 @@ std::size_t CalcBestPerformanceThreads(pool_type mode)
 	}
 	return nCpus;
 }
-
 
 CThreadPool::CThreadPool(std::size_t cores)
 {
@@ -98,7 +97,6 @@ void CThreadPool::ShutDown()
 			}
 		}
 		m_workers.clear();
-
 	}
 	m_worker_count.store(0);
 	m_tasks.store(0);
@@ -143,11 +141,9 @@ void CThreadPool::ThreadProc()
 			try
 			{
 				task();
-
 			}
 			catch (const std::exception&)
 			{
-
 			}
 			--m_busy_workers;
 		}
@@ -170,7 +166,7 @@ bool CThreadPool::IsNeedAssistant()
 	}
 	std::size_t nTasks = m_tasks.load();
 	std::size_t nWorkers = m_worker_count.load();
-	return  (nTasks > (nWorkers * 2.5)) && (nTasks >= 20);
+	return (nTasks > (nWorkers * 2.5)) && (nTasks >= 20);
 }
 
 void CThreadPool::BuildNewThread(std::size_t threads)

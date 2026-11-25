@@ -46,7 +46,7 @@ namespace net
 	{
 		std::vector<std::unique_ptr<CRequest>> reqs;
 		std::size_t sz = net::RequestFromBuffer(reqs, pEvent);
-		if (m_dispatcher != nullptr)
+		if (nullptr != m_dispatcher)
 		{
 			std::vector<CNetEvent> events;
 			events.reserve(reqs.size());
@@ -64,7 +64,7 @@ namespace net
 
 	void CTcpServer::OnEvent(struct bufferevent* pEvent, short events)
 	{
-		if (pEvent == nullptr)
+		if (nullptr == pEvent)
 		{
 			return;
 		}

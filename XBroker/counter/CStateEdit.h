@@ -6,7 +6,7 @@ namespace trade
 	// One command owns an undo journal. Only touched records are copied; history is append-only.
 	class CStateEdit final
 	{
-		public:
+	public:
 		explicit CStateEdit(CState& state) : m_state(state)
 		{
 			m_original.m_next_order = state.m_next_order;
@@ -89,7 +89,7 @@ namespace trade
 			m_finished = true;
 		}
 
-		private:
+	private:
 		template <class Key, class Value>
 		void Copy(std::map<Key, Value> CState::* member, CState& changes) const
 		{

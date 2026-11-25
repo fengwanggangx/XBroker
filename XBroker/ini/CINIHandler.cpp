@@ -9,8 +9,7 @@ namespace ini
 	namespace
 	{
 		using _TyCfg = std::pair<Config, std::filesystem::path>;
-		const std::array<_TyCfg, 1> configFiles
-		{
+		const std::array<_TyCfg, 1> configFiles{
 			_TyCfg{ Config::System, std::filesystem::path("ini") / "system.ini" }
 		};
 	} // namespace

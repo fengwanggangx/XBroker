@@ -252,8 +252,8 @@ bool CTradeService::HandleAccountLogin(const CRequest& req)
 			return false;
 		}
 		std::string strSql = "SELECT account FROM table_account WHERE broker_id=" + std::to_string(account.first) +
-			" AND account=" + utility::Utf8Literal(account.second) +
-			" AND password_hash=UNHEX(SHA2(CONCAT(password_salt,UNHEX('" + utility::ToHex(req.GetExtraData("password")) + "')),256)) AND status=1 LIMIT 1";
+							 " AND account=" + utility::Utf8Literal(account.second) +
+							 " AND password_hash=UNHEX(SHA2(CONCAT(password_salt,UNHEX('" + utility::ToHex(req.GetExtraData("password")) + "')),256)) AND status=1 LIMIT 1";
 		const db::CTable& table = pDB->ExecQuery(strSql);
 		if (table.m_columns.empty())
 		{

@@ -12,6 +12,6 @@ namespace md
 	};
 
 	std::string GetModuleName(md::modules m);
-}
+} // namespace md
 
 #endif
