@@ -3,6 +3,7 @@
 #include "../TradeProtocol.h"
 #include <algorithm>
 #include <limits>
+#include <set>
 #include <stdexcept>
 #include <unordered_map>
 #include "../../common/container.h"
@@ -892,11 +893,26 @@ void CZhongTaiDispatcher::FinishQuery()
 		}
 		if (Operation::Positions == query.m_operation)
 		{
+			std::set<std::string> absent;
+			for (const auto& position : session.m_snapshot.m_positions)
+			{
+				absent.emplace(position.m_security);
+			}
+			// A fresh empty result also confirms the position for recovered sell orders.
+			for (const auto& item : session.m_orders)
+			{
+				const COrder& order = item.second;
+				if (Side::Sell == order.m_side && Terminal(order.m_status) && order.m_day == session.m_journal.trading_day())
+				{
+					absent.emplace(order.m_security);
+				}
+			}
 			session.m_snapshot.m_positions.clear();
 			for (const auto& event : query.m_data)
 			{
 				CPosition position = event.m_position;
 				position.m_account_index = session.m_account;
+				absent.erase(position.m_security);
 				session.m_snapshot.m_positions.emplace_back(std::move(position));
 			}
 			for (const auto& position : session.m_snapshot.m_positions)
@@ -904,6 +920,14 @@ void CZhongTaiDispatcher::FinishQuery()
 				CCountEvent event;
 				event.m_kind = EventTy::Position;
 				event.m_position = position;
+				Publish(session, std::move(event));
+			}
+			for (const std::string& security : absent)
+			{
+				CCountEvent event;
+				event.m_kind = EventTy::Position;
+				event.m_position.m_account_index = session.m_account;
+				event.m_position.m_security = security;
 				Publish(session, std::move(event));
 			}
 		}

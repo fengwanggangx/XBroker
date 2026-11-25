@@ -108,6 +108,13 @@ namespace
 			if (Operation::Positions == operation)
 			{
 				event.m_type = ApiEventType::Position;
+				if (m_hasPosition.load())
+				{
+					event.m_has_row = true;
+					event.m_position.m_security = "600001.SSE";
+					event.m_position.m_total = 100;
+					event.m_position.m_available = 100;
+				}
 			}
 			if (Operation::Orders == operation)
 			{
@@ -219,6 +226,7 @@ namespace
 		}
 		std::atomic_int m_submits{ 0 }, m_logins{ 0 };
 		std::atomic_bool m_query_failure{ false }, m_hang{ false }, m_pages{ false }, m_throw_submit{ false }, m_cancel_failure{ false }, m_reject_next{ false };
+		std::atomic_bool m_hasPosition{ false };
 		std::atomic_int m_page_calls{ 0 };
 		std::mutex m_state_mutex;
 		std::vector<std::string> m_hosts;
@@ -316,6 +324,21 @@ namespace
 			Check(2 == fake->m_hosts.size() && "host-a" == fake->m_hosts[0] && "host-b" == fake->m_hosts[1], "independent login endpoints");
 		}
 		Check(!Send(first, Request(a, Operation::Login)).m_result.Ok(), "duplicate login rejected");
+		std::shared_ptr<std::atomic_uint64_t> zeroPosition = std::make_shared<std::atomic_uint64_t>(0);
+		first->SetEventHandler([zeroPosition](const CCountEvent& event)
+		{
+			if (EventTy::Position == event.m_kind && "600001.SSE" == event.m_position.m_security && 0 == event.m_position.m_total)
+			{
+				zeroPosition->store(event.m_sequence);
+			}
+		});
+		fake->m_hasPosition.store(true);
+		CCounterReply held = Send(first, Request(a, Operation::Positions));
+		Check(held.m_result.Ok() && 1 == std::get<std::vector<CPosition>>(held.m_data).size(), "position query returns the holding");
+		fake->m_hasPosition.store(false);
+		CCounterReply flat = Send(first, Request(a, Operation::Positions));
+		Check(flat.m_result.Ok() && std::get<std::vector<CPosition>>(flat.m_data).empty() && held.m_version < zeroPosition->load(), "empty position query publishes a zero update for the removed holding");
+		first->SetEventHandler({});
 		CCounterReply funds = Send(first, Request(a, Operation::Funds));
 		Check(funds.m_result.Ok() && 9000000 == std::get<CFunds>(funds.m_data).m_available, "explicit broker available cash");
 		CCounterReply accepted = Send(first, Request(a, Operation::Submit));
@@ -398,6 +421,7 @@ namespace
 		Check(Status::Rejected == first->Snapshot().m_orders.back().m_status, "broker rejection is final");
 		CReqParam filled = Request(a, Operation::Submit);
 		std::get<CSubmitParam>(filled.m_param).m_order.m_client_id = 3;
+		std::get<CSubmitParam>(filled.m_param).m_order.m_side = Side::Sell;
 		Check(Send(first, filled).m_result.Ok(), "next order after rejection");
 		Send(first, Request(a, Operation::Orders));
 		trade.m_trade.m_broker_order_id = "1003";
@@ -406,6 +430,17 @@ namespace
 		fake->Emit(trade);
 		Send(first, Request(a, Operation::Orders));
 		Check(Status::Filled == first->Snapshot().m_orders.back().m_status, "complete fill from trade callback");
+		std::shared_ptr<std::atomic_uint64_t> flatAfterSell = std::make_shared<std::atomic_uint64_t>(0);
+		first->SetEventHandler([flatAfterSell](const CCountEvent& event)
+		{
+			if (EventTy::Position == event.m_kind && "600000.SSE" == event.m_position.m_security && 0 == event.m_position.m_total)
+			{
+				flatAfterSell->store(event.m_sequence);
+			}
+		});
+		std::uint64_t sellVersion = first->Snapshot().m_version;
+		Check(Send(first, Request(a, Operation::Positions)).m_result.Ok() && sellVersion < flatAfterSell->load(), "empty position query supplies fresh evidence for a terminal sell without a cached position");
+		first->SetEventHandler({});
 		CTrade tomorrow = trade.m_trade;
 		++tomorrow.m_day;
 		Check(TradeKey(tomorrow) != TradeKey(trade.m_trade), "cross-day reports remain distinct");
